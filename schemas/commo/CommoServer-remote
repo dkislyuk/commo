@@ -24,6 +24,9 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print ''
   print 'Functions:'
   print '  void ping()'
+  print '  i32 joinGame()'
+  print '  Location getInitialLocation(i32 clientId)'
+  print '  ActionStatusCode takeAction(i32 clientId, Action action)'
   print ''
   sys.exit(0)
 
@@ -80,6 +83,24 @@ if cmd == 'ping':
     print 'ping requires 0 args'
     sys.exit(1)
   pp.pprint(client.ping())
+
+elif cmd == 'joinGame':
+  if len(args) != 0:
+    print 'joinGame requires 0 args'
+    sys.exit(1)
+  pp.pprint(client.joinGame())
+
+elif cmd == 'getInitialLocation':
+  if len(args) != 1:
+    print 'getInitialLocation requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.getInitialLocation(eval(args[0]),))
+
+elif cmd == 'takeAction':
+  if len(args) != 2:
+    print 'takeAction requires 2 args'
+    sys.exit(1)
+  pp.pprint(client.takeAction(eval(args[0]),eval(args[1]),))
 
 else:
   print 'Unrecognized method %s' % cmd
