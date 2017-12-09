@@ -24,7 +24,7 @@ class Iface:
   def joinGame(self):
     pass
 
-  def getInitialLocation(self, clientId):
+  def initializeClient(self, clientId):
     """
     Parameters:
      - clientId
@@ -95,35 +95,35 @@ class Client(Iface):
       return result.success
     raise TApplicationException(TApplicationException.MISSING_RESULT, "joinGame failed: unknown result");
 
-  def getInitialLocation(self, clientId):
+  def initializeClient(self, clientId):
     """
     Parameters:
      - clientId
     """
-    self.send_getInitialLocation(clientId)
-    return self.recv_getInitialLocation()
+    self.send_initializeClient(clientId)
+    return self.recv_initializeClient()
 
-  def send_getInitialLocation(self, clientId):
-    self._oprot.writeMessageBegin('getInitialLocation', TMessageType.CALL, self._seqid)
-    args = getInitialLocation_args()
+  def send_initializeClient(self, clientId):
+    self._oprot.writeMessageBegin('initializeClient', TMessageType.CALL, self._seqid)
+    args = initializeClient_args()
     args.clientId = clientId
     args.write(self._oprot)
     self._oprot.writeMessageEnd()
     self._oprot.trans.flush()
 
-  def recv_getInitialLocation(self):
+  def recv_initializeClient(self):
     (fname, mtype, rseqid) = self._iprot.readMessageBegin()
     if mtype == TMessageType.EXCEPTION:
       x = TApplicationException()
       x.read(self._iprot)
       self._iprot.readMessageEnd()
       raise x
-    result = getInitialLocation_result()
+    result = initializeClient_result()
     result.read(self._iprot)
     self._iprot.readMessageEnd()
     if result.success is not None:
       return result.success
-    raise TApplicationException(TApplicationException.MISSING_RESULT, "getInitialLocation failed: unknown result");
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "initializeClient failed: unknown result");
 
   def takeAction(self, clientId, action):
     """
@@ -164,7 +164,7 @@ class Processor(Iface, TProcessor):
     self._processMap = {}
     self._processMap["ping"] = Processor.process_ping
     self._processMap["joinGame"] = Processor.process_joinGame
-    self._processMap["getInitialLocation"] = Processor.process_getInitialLocation
+    self._processMap["initializeClient"] = Processor.process_initializeClient
     self._processMap["takeAction"] = Processor.process_takeAction
 
   def process(self, iprot, oprot):
@@ -204,13 +204,13 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
-  def process_getInitialLocation(self, seqid, iprot, oprot):
-    args = getInitialLocation_args()
+  def process_initializeClient(self, seqid, iprot, oprot):
+    args = initializeClient_args()
     args.read(iprot)
     iprot.readMessageEnd()
-    result = getInitialLocation_result()
-    result.success = self._handler.getInitialLocation(args.clientId)
-    oprot.writeMessageBegin("getInitialLocation", TMessageType.REPLY, seqid)
+    result = initializeClient_result()
+    result.success = self._handler.initializeClient(args.clientId)
+    oprot.writeMessageBegin("initializeClient", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -414,7 +414,7 @@ class joinGame_result:
   def __ne__(self, other):
     return not (self == other)
 
-class getInitialLocation_args:
+class initializeClient_args:
   """
   Attributes:
    - clientId
@@ -451,7 +451,7 @@ class getInitialLocation_args:
     if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
-    oprot.writeStructBegin('getInitialLocation_args')
+    oprot.writeStructBegin('initializeClient_args')
     if self.clientId is not None:
       oprot.writeFieldBegin('clientId', TType.I32, 1)
       oprot.writeI32(self.clientId)
@@ -474,14 +474,14 @@ class getInitialLocation_args:
   def __ne__(self, other):
     return not (self == other)
 
-class getInitialLocation_result:
+class initializeClient_result:
   """
   Attributes:
    - success
   """
 
   thrift_spec = (
-    (0, TType.STRUCT, 'success', (Location, Location.thrift_spec), None, ), # 0
+    (0, TType.STRUCT, 'success', (StartGameResponse, StartGameResponse.thrift_spec), None, ), # 0
   )
 
   def __init__(self, success=None,):
@@ -498,7 +498,7 @@ class getInitialLocation_result:
         break
       if fid == 0:
         if ftype == TType.STRUCT:
-          self.success = Location()
+          self.success = StartGameResponse()
           self.success.read(iprot)
         else:
           iprot.skip(ftype)
@@ -511,7 +511,7 @@ class getInitialLocation_result:
     if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
-    oprot.writeStructBegin('getInitialLocation_result')
+    oprot.writeStructBegin('initializeClient_result')
     if self.success is not None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
@@ -614,7 +614,7 @@ class takeAction_result:
   """
 
   thrift_spec = (
-    (0, TType.I32, 'success', None, None, ), # 0
+    (0, TType.STRUCT, 'success', (ActionResponse, ActionResponse.thrift_spec), None, ), # 0
   )
 
   def __init__(self, success=None,):
@@ -630,8 +630,9 @@ class takeAction_result:
       if ftype == TType.STOP:
         break
       if fid == 0:
-        if ftype == TType.I32:
-          self.success = iprot.readI32();
+        if ftype == TType.STRUCT:
+          self.success = ActionResponse()
+          self.success.read(iprot)
         else:
           iprot.skip(ftype)
       else:
@@ -645,8 +646,8 @@ class takeAction_result:
       return
     oprot.writeStructBegin('takeAction_result')
     if self.success is not None:
-      oprot.writeFieldBegin('success', TType.I32, 0)
-      oprot.writeI32(self.success)
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
