@@ -82,6 +82,9 @@ class CommoServerHandler:
         if action.type == ActionType.MOVE:
             self.game_state.clientStates[client_id].location = \
                     action.moveTarget
+
+            logger.info("Client %s moved to %s" %
+                        (client_id, action.moveTarget))
         elif action.type == ActionType.ATTACK:
             pass
         elif action.type == ActionType.HEAL:

@@ -1,5 +1,8 @@
 import logging
+import random
 import time
+
+from game import BoringGame
 
 from thrift import Thrift
 from thrift.transport import TSocket
@@ -37,7 +40,7 @@ class CommoClient:
         logger.info('Joined game with client id: %s' % self.client_id)
         global logger
 
-        self.initial_location = None
+        initial_location = None
 
         # Wait until game begins
         while True:
@@ -45,19 +48,19 @@ class CommoClient:
             response = self.server.initializeClient(self.client_id)
             self.transport.close()
 
-            print response
-
             if response.status == StatusCode.GAME_NOT_STARTED:
                 logger.info("...game not ready yet")
                 time.sleep(1)
             elif response.status == StatusCode.SUCCESS:
                 logger.info("...game has started!")
-                self.initial_location = response.initialLocation
+                initial_location = response.initialLocation
                 break
             else:
                 raise Exception("Invalid status code returned %s" % response.status)
 
-        logger.info('Initial location: %s' % self.initial_location)
+        self.current_location = initial_location
+
+        logger.info('Initial location: %s' % initial_location)
 
     def main_loop(self):
         time.sleep(2)
@@ -65,12 +68,44 @@ class CommoClient:
 
         test_action = Action()
         test_action.type = ActionType.MOVE
-        test_action.moveTarget = self.initial_location
+        test_action.moveTarget = self.current_location
 
         self.transport.open()
-        logger.info("taking test action")
         self.server.takeAction(self.client_id, test_action)
         self.transport.close()
+
+        logger.info("Sanity check action OK")
+
+        destination = BoringGame().random_location()
+
+        while True:
+            time.sleep(1)
+
+            action = Action()
+            action.type = ActionType.MOVE
+            action.moveTarget = self.current_location
+
+            if self.current_location != destination:
+                if destination[0] > self.current_location.x:
+                    action.moveTarget.x += 1
+                elif destination[0] < self.current_location.x:
+                    action.moveTarget.x -= 1
+
+                if destination[1] > self.current_location.y:
+                    action.moveTarget.y += 1
+                elif destination[1] < self.current_location.y:
+                    action.moveTarget.y -= 1
+            else:
+                destination = BoringGame().random_location()
+
+            self.transport.open()
+            response = self.server.takeAction(self.client_id, action)
+            self.transport.close()
+
+            if response.status == StatusCode.SUCCESS:
+                client_states = response.updatedGameState.clientStates
+                self.current_location = client_states[self.client_id].location
+                logger.info("Moved to %s" % self.current_location)
 
 
 if __name__ == '__main__':
