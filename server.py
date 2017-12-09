@@ -64,8 +64,7 @@ class CommoServerHandler:
             response.status = StatusCode.GAME_ENDED
         elif self.game_status == GameStatus.STARTED:
             response.status = StatusCode.SUCCESS
-            x, y = self.game.random_location()
-            initial_location = Location(x=x, y=y)
+            initial_location = self.game.random_location()
 
             self.game_state.clientStates[client_id].location = initial_location
             self.game_state.clientStates[client_id].health = INITIAL_HEALTH

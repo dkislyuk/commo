@@ -22,6 +22,8 @@ logging.basicConfig()
 class CommoClient:
 
     def __init__(self):
+        self.game = BoringGame()
+
         # Make socket
         socket = TSocket.TSocket('localhost', 9090)
         self.transport = TTransport.TBufferedTransport(socket)
@@ -76,27 +78,27 @@ class CommoClient:
 
         logger.info("Sanity check action OK")
 
-        destination = BoringGame().random_location()
+        destination = self.game.random_location()
 
         while True:
-            time.sleep(1)
+            time.sleep(0.01)
 
             action = Action()
             action.type = ActionType.MOVE
             action.moveTarget = self.current_location
 
             if self.current_location != destination:
-                if destination[0] > self.current_location.x:
+                if destination.x > self.current_location.x:
                     action.moveTarget.x += 1
-                elif destination[0] < self.current_location.x:
+                elif destination.x < self.current_location.x:
                     action.moveTarget.x -= 1
 
-                if destination[1] > self.current_location.y:
+                if destination.y > self.current_location.y:
                     action.moveTarget.y += 1
-                elif destination[1] < self.current_location.y:
+                elif destination.y < self.current_location.y:
                     action.moveTarget.y -= 1
             else:
-                destination = BoringGame().random_location()
+                destination = self.game.random_location()
 
             self.transport.open()
             response = self.server.takeAction(self.client_id, action)
@@ -106,6 +108,13 @@ class CommoClient:
                 client_states = response.updatedGameState.clientStates
                 self.current_location = client_states[self.client_id].location
                 logger.info("Moved to %s" % self.current_location)
+
+                for cid, client_state in client_states.iteritems():
+                    if cid != self.client_id:
+                        if self.game.within_proximity(self.current_location,
+                                                      client_state.location):
+                            logger.info("PROXIMITY WARNING with client %s" %
+                                        cid)
 
 
 if __name__ == '__main__':
