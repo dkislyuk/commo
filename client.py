@@ -16,59 +16,63 @@ from schemas.commo.ttypes import Location
 logging.basicConfig()
 
 
-def run_client():
-    # Make socket
-    transport = TSocket.TSocket('localhost', 9090)
-    transport = TTransport.TBufferedTransport(transport)
-    protocol = TBinaryProtocol.TBinaryProtocol(transport)
-    server = CommoServer.Client(protocol)
+class CommoClient:
 
-    # Connect!
-    transport.open()
+    def __init__(self):
+        # Make socket
+        socket = TSocket.TSocket('localhost', 9090)
+        self.transport = TTransport.TBufferedTransport(socket)
+        protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+        self.server = CommoServer.Client(protocol)
 
-    server.ping()
+        # Connect!
+        self.transport.open()
+        self.server.ping()
 
-    client_id = server.joinGame()
-    transport.close()
+        self.client_id = self.server.joinGame()
+        self.transport.close()
 
-    logger = logging.getLogger("commo-client-%s" % client_id)
-    logger.setLevel('DEBUG')
-    logger.info('Joined game with client id: %s' % client_id)
+        logger = logging.getLogger("commo-client-%s" % self.client_id)
+        logger.setLevel('DEBUG')
+        logger.info('Joined game with client id: %s' % self.client_id)
+        global logger
 
-    initial_location = None
+        self.initial_location = None
 
-    # Wait until game begins
-    while True:
-        transport.open()
-        response = server.initializeClient(client_id)
-        transport.close()
+        # Wait until game begins
+        while True:
+            self.transport.open()
+            response = self.server.initializeClient(self.client_id)
+            self.transport.close()
 
-        print response
+            print response
 
-        if response.status == StatusCode.GAME_NOT_STARTED:
-            logger.info("...game not ready yet")
-            time.sleep(1)
-        elif response.status == StatusCode.SUCCESS:
-            logger.info("...game has started!")
-            initial_location = response.initialLocation
-            break
-        else:
-            raise Exception("Invalid status code returned %s" % response.status)
+            if response.status == StatusCode.GAME_NOT_STARTED:
+                logger.info("...game not ready yet")
+                time.sleep(1)
+            elif response.status == StatusCode.SUCCESS:
+                logger.info("...game has started!")
+                self.initial_location = response.initialLocation
+                break
+            else:
+                raise Exception("Invalid status code returned %s" % response.status)
 
-    logger.info("moving to next stage")
-    time.sleep(2)
+        logger.info('Initial location: %s' % self.initial_location)
 
-    test_action = Action()
-    test_action.type = ActionType.MOVE
-    test_action.moveTarget = initial_location
+    def main_loop(self):
+        time.sleep(2)
+        logger.info("Entering main loop")
 
-    transport.open()
-    logger.info("taking test action")
-    server.takeAction(client_id, test_action)
-    transport.close()
+        test_action = Action()
+        test_action.type = ActionType.MOVE
+        test_action.moveTarget = self.initial_location
 
-    logger.info('Initial location: %s' % initial_location)
+        self.transport.open()
+        logger.info("taking test action")
+        self.server.takeAction(self.client_id, test_action)
+        self.transport.close()
 
 
 if __name__ == '__main__':
-    run_client()
+    client = CommoClient()
+    client.main_loop()
