@@ -35,7 +35,6 @@ class CommoClient:
         self.server.ping()
 
         self.client_id = self.server.joinGame()
-        self.transport.close()
 
         logger = logging.getLogger("commo-client-%s" % self.client_id)
         logger.setLevel('DEBUG')
@@ -46,9 +45,7 @@ class CommoClient:
 
         # Wait until game begins
         while True:
-            self.transport.open()
             response = self.server.initializeClient(self.client_id)
-            self.transport.close()
 
             if response.status == StatusCode.GAME_NOT_STARTED:
                 logger.info("...game not ready yet")
@@ -72,9 +69,7 @@ class CommoClient:
         test_action.type = ActionType.MOVE
         test_action.moveTarget = self.current_location
 
-        self.transport.open()
         self.server.takeAction(self.client_id, test_action)
-        self.transport.close()
 
         logger.info("Sanity check action OK")
 
@@ -100,9 +95,7 @@ class CommoClient:
             else:
                 destination = self.game.random_location()
 
-            self.transport.open()
             response = self.server.takeAction(self.client_id, action)
-            self.transport.close()
 
             if response.status == StatusCode.SUCCESS:
                 client_states = response.updatedGameState.clientStates
