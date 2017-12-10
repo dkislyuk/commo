@@ -50,11 +50,18 @@ struct ActionResponse {
     2: GameState updatedGameState
 }
 
+struct ClockSyncResponse {
+    1: StatusCode status
+    2: i64 timestamp
+}
+
 service CommoServer {
 
    void ping(),
    i32 joinGame(),
    StartGameResponse initializeClient(1: i32 clientId),
    ActionResponse takeAction(1: i32 clientId, 2: Action action),
+
+   ClockSyncResponse clockSync(1: i32 clientId, 2: i64 timestamp),
 }
 
