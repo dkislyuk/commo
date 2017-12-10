@@ -1,115 +1,211 @@
+import copy
 import logging
-import random
 import time
 
-from game import BoringGame
+from config import SERVER_HOST, SERVER_PORT
+from game import Game
 
-from thrift import Thrift
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
 from schemas.commo import CommoServer
-from schemas.commo.ttypes import Action
+from schemas.commo.ttypes import Action, GameStatus, Location
 from schemas.commo.ttypes import ActionType
 from schemas.commo.ttypes import StatusCode
-from schemas.commo.ttypes import Location
 
 
 logging.basicConfig()
 
+def connect_to_server():
+    # Make socket
+    socket = TSocket.TSocket(SERVER_HOST, SERVER_PORT)
+    transport = TTransport.TBufferedTransport(socket)
+    protocol = TBinaryProtocol.TBinaryProtocol(transport)
+    server = CommoServer.Client(protocol)
 
-class CommoClient:
+    # Connect!
+    transport.open()
+    server.ping()
+
+    return transport, server
+
+
+
+
+
+# Base Class that defines player interface. UI will work as long as interface is defined.
+# Decentralized players should be it's own Player type for simplicity.
+class PlayerInterf(object):
+    @property
+    def id(self):
+        """
+        Returns player id
+        """
+        raise NotImplementedError()
+
+    @property
+    def world(self):
+        """
+        Returns: Game
+        """
+        raise NotImplementedError()
+
+    def move(self, location):
+        """
+        Args:
+            location: Location to move to
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+    def attack(self, target_id):
+        """
+        Args:
+            target_id: id of target
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+    def heal(self, target_id):
+        """
+        Args:
+            target_id: id of target
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+
+class CentralizedPlayer(PlayerInterf):
 
     def __init__(self):
-        self.game = BoringGame()
+        self.game = Game()
 
-        # Make socket
-        socket = TSocket.TSocket('localhost', 9090)
-        self.transport = TTransport.TBufferedTransport(socket)
-        protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
-        self.server = CommoServer.Client(protocol)
+        self.transport, self.server = connect_to_server()
+        self.player_id = self.server.join_game()
 
-        # Connect!
-        self.transport.open()
-        self.server.ping()
-
-        self.client_id = self.server.joinGame()
-
-        logger = logging.getLogger("commo-client-%s" % self.client_id)
+        logger = logging.getLogger("commo-client-%s" % self.player_id)
         logger.setLevel('DEBUG')
-        logger.info('Joined game with client id: %s' % self.client_id)
+        logger.info('Joined game with player id: %s' % self.player_id)
         global logger
-
-        initial_location = None
 
         # Wait until game begins
         while True:
-            response = self.server.initializeClient(self.client_id)
+            response = self.server.start_game()
 
-            if response.status == StatusCode.GAME_NOT_STARTED:
+            if response.status == GameStatus.WAITING_FOR_PLAYERS:
                 logger.info("...game not ready yet")
                 time.sleep(1)
-            elif response.status == StatusCode.SUCCESS:
+            elif response.status == GameStatus.STARTED:
                 logger.info("...game has started!")
-                initial_location = response.initialLocation
+                self.game.state = response.updated_game_state
                 break
+            elif response.status == GameStatus.ENDED:
+                raise Exception("Game already ended")
             else:
                 raise Exception("Invalid status code returned %s" % response.status)
 
-        self.current_location = initial_location
+        self.current_location = self.game.state.player_states[self.player_id].location
+        logger.info('Initial location: %s' % self.current_location)
 
-        logger.info('Initial location: %s' % initial_location)
+    @property
+    def id(self):
+        return self.player_id
 
-    def main_loop(self):
-        time.sleep(2)
-        logger.info("Entering main loop")
+    @property
+    def world(self):
+        return self.game
 
-        test_action = Action()
-        test_action.type = ActionType.MOVE
-        test_action.moveTarget = self.current_location
+    def move(self, location):
+        action = Action(type=ActionType.MOVE,
+                        move_target=location)
 
-        self.server.takeAction(self.client_id, test_action)
+        response = self.server.take_action(self.player_id, action)
+        self.game.state = response.updated_game_state
+        return response.status
 
-        logger.info("Sanity check action OK")
 
-        destination = self.game.random_location()
+def random_move_agent(player):
+    """
+    TODO:
+    Main loop should be outside of client.
 
-        while True:
-            time.sleep(0.01)
+    We need three types of players:
+        - Random Players like what is implemented here
+        - Hacker Players that try to do illegal moves
+        - User Players which operators can control to manipulate the game manually
 
-            action = Action()
-            action.type = ActionType.MOVE
-            action.moveTarget = self.current_location
+    Need to handle disconnects client wise. We should show if a client disconnects, game state will eventually
+    remove him.
 
-            if self.current_location != destination:
-                if destination.x > self.current_location.x:
-                    action.moveTarget.x += 1
-                elif destination.x < self.current_location.x:
-                    action.moveTarget.x -= 1
+    Overall properties of game (we should show these via visualizations and they should hold for decentralized system):
+        - Safety - be able to detect hackers (moving too fast or hitting/healing someone outside proximity)
+        - Network Tolerance - if client loses connection, they are removed from game
+        - Correctness - game actually works (we can move around a player in game and see actions make sense)
+    """
 
-                if destination.y > self.current_location.y:
-                    action.moveTarget.y += 1
-                elif destination.y < self.current_location.y:
-                    action.moveTarget.y -= 1
-            else:
-                destination = self.game.random_location()
+    def next_step(current_location, destination):
+        """
+        Args:
+            current_location: Location
+            destination: Location
 
-            response = self.server.takeAction(self.client_id, action)
+        Returns:
+            Location for next step to take
+        """
+        step = copy.deepcopy(current_location)
+        if destination.x > current_location.x:
+            step.x += 1
+        elif destination.x < current_location.x:
+            step.x -= 1
 
-            if response.status == StatusCode.SUCCESS:
-                client_states = response.updatedGameState.clientStates
-                self.current_location = client_states[self.client_id].location
-                logger.info("Moved to %s" % self.current_location)
+        if destination.y > current_location.y:
+            step.y += 1
+        elif destination.y < current_location.y:
+            step.y -= 1
 
-                for cid, client_state in client_states.iteritems():
-                    if cid != self.client_id:
-                        if self.game.within_proximity(self.current_location,
-                                                      client_state.location):
-                            logger.info("PROXIMITY WARNING with client %s" %
-                                        cid)
+        return step
+
+    time.sleep(2)
+    logger.info("Entering main loop")
+
+    current_location = player.world.state.player_states[player.id].location
+
+    status = player.move(current_location)
+    assert status == StatusCode.SUCCESS
+
+    logger.info("Sanity check action OK")
+    destination = player.world.random_location()
+
+    while True:
+        time.sleep(0.01)
+
+        if current_location != destination:
+            move_target = next_step(current_location, destination)
+        else:
+            move_target = current_location
+            destination = player.world.random_location()
+
+        response_status = player.move(move_target)
+
+        if response_status == StatusCode.SUCCESS:
+            current_location = player.world.state.player_states[player.id].location
+            logger.info("Moved to %s" % current_location)
+
+            for pid, player_state in player.world.state.player_states.iteritems():
+                if pid != player.id:
+                    if player.world.within_proximity(current_location,
+                                                     player_state.location):
+                        logger.info("PROXIMITY WARNING with player %s" %
+                                    pid)
 
 
 if __name__ == '__main__':
-    client = CommoClient()
-    client.main_loop()
+    player = CentralizedPlayer()
+    random_move_agent(player)
