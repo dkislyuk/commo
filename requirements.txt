@@ -1,1 +1,2 @@
 thrift
+click==6.7

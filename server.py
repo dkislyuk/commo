@@ -1,3 +1,4 @@
+import click
 import logging
 
 from thrift.transport import TSocket
@@ -16,6 +17,7 @@ from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import Location
 from schemas.commo.ttypes import StartGameResponse
 from schemas.commo.ttypes import StatusCode
+
 
 
 logging.basicConfig()
@@ -104,8 +106,9 @@ class CommoServerHandler:
 
         self.game_status = GameStatus.STARTED
 
-
-if __name__ == '__main__':
+@click.command()
+@click.option('--threads', default=10, help='Number of threads for server')
+def main(threads):
     handler = CommoServerHandler()
     processor = CommoServer.Processor(handler)
     transport = TSocket.TServerSocket(host='127.0.0.1', port=9090)
@@ -113,6 +116,10 @@ if __name__ == '__main__':
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
     server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
+    server.setNumThreads(threads)
 
     logger.info("Starting server!")
     server.serve()
+
+if __name__ == '__main__':
+    main()
