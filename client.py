@@ -2,12 +2,15 @@ import copy
 import logging
 import time
 
-from config import SERVER_HOST, SERVER_PORT
-from game import Game
+
+from pysyncobj import SyncObj, SyncObjConf
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
+
+from config import SERVER_HOST, SERVER_PORT
+from game import Game
 
 from schemas.commo import CommoServer
 from schemas.commo.ttypes import Action, GameStatus, Location
@@ -16,6 +19,7 @@ from schemas.commo.ttypes import StatusCode
 
 
 logging.basicConfig()
+
 
 def connect_to_server():
     # Make socket
@@ -31,7 +35,20 @@ def connect_to_server():
     return transport, server
 
 
+def generate_cluster_serverport(client_id):
+    return 'localhost:%s' % (9000 + client_id)
 
+
+class SyncedGameStateWatcher(SyncObj):
+    def __init__(self, client_id):
+        conf = SyncObjConf(dynamicMembershipChange=True)
+        serverport = generate_cluster_serverport(client_id)
+        super(SyncedGameStateWatcher, self).__init__(serverport, [], conf=conf)
+        self.__counter = 0
+
+
+# def create_synced_obj(client_id):
+#port = SERVER_PORT + client_id
 
 
 # Base Class that defines player interface. UI will work as long as interface is defined.
@@ -89,6 +106,9 @@ class CentralizedPlayer(PlayerInterf):
 
         self.transport, self.server = connect_to_server()
         self.player_id = self.server.join_game()
+
+        # Set up the decentralized watcher
+        self.cluster = SyncedGameStateWatcher(self.player_id)
 
         logger = logging.getLogger("commo-client-%s" % self.player_id)
         logger.setLevel('DEBUG')
@@ -204,6 +224,10 @@ def random_move_agent(player):
                                                      player_state.location):
                         logger.info("PROXIMITY WARNING with player %s" %
                                     pid)
+
+                        proximity_serverport = generate_cluster_serverport(pid)
+                        player.cluster.addNodeToCluster(proximity_serverport)
+                        import ipdb; ipdb.set_trace()
 
 
 if __name__ == '__main__':
