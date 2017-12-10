@@ -31,29 +31,58 @@ def connect_to_server():
     return transport, server
 
 
-def next_step(current_location, destination):
-    """
-    Args:
-        current_location: Location
-        destination: Location
 
-    Returns:
-        Location for next step to take
-    """
-    step = copy.deepcopy(current_location)
-    if destination.x > current_location.x:
-        step.x += 1
-    elif destination.x < current_location.x:
-        step.x -= 1
 
-    if destination.y > current_location.y:
-        step.y += 1
-    elif destination.y < current_location.y:
-        step.y -= 1
 
-    return step
+# Base Class that defines player interface. UI will work as long as interface is defined.
+# Decentralized players should be it's own Player type for simplicity.
+class PlayerInterf(object):
+    @property
+    def id(self):
+        """
+        Returns player id
+        """
+        raise NotImplementedError()
 
-class CommoClient(object):
+    @property
+    def world(self):
+        """
+        Returns: Game
+        """
+        raise NotImplementedError()
+
+    def move(self, location):
+        """
+        Args:
+            location: Location to move to
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+    def attack(self, target_id):
+        """
+        Args:
+            target_id: id of target
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+    def heal(self, target_id):
+        """
+        Args:
+            target_id: id of target
+
+        Returns:
+            StatusCode
+        """
+        raise NotImplementedError()
+
+
+class CentralizedPlayer(PlayerInterf):
 
     def __init__(self):
         self.game = Game()
@@ -85,62 +114,98 @@ class CommoClient(object):
         self.current_location = self.game.state.player_states[self.player_id].location
         logger.info('Initial location: %s' % self.current_location)
 
-    def main_loop(self):
+    @property
+    def id(self):
+        return self.player_id
+
+    @property
+    def world(self):
+        return self.game
+
+    def move(self, location):
+        action = Action(type=ActionType.MOVE,
+                        move_target=location)
+
+        response = self.server.take_action(self.player_id, action)
+        self.game.state = response.updated_game_state
+        return response.status
+
+
+def random_move_agent(player):
+    """
+    TODO:
+    Main loop should be outside of client.
+
+    We need three types of players:
+        - Random Players like what is implemented here
+        - Hacker Players that try to do illegal moves
+        - User Players which operators can control to manipulate the game manually
+
+    Need to handle disconnects client wise. We should show if a client disconnects, game state will eventually
+    remove him.
+
+    Overall properties of game (we should show these via visualizations and they should hold for decentralized system):
+        - Safety - be able to detect hackers (moving too fast or hitting/healing someone outside proximity)
+        - Network Tolerance - if client loses connection, they are removed from game
+        - Correctness - game actually works (we can move around a player in game and see actions make sense)
+    """
+
+    def next_step(current_location, destination):
         """
-        TODO:
-        Main loop should be outside of client.
+        Args:
+            current_location: Location
+            destination: Location
 
-        We need three types of players:
-            - Random Players like what is implemented here
-            - Hacker Players that try to do illegal moves
-            - User Players which operators can control to manipulate the game manually
-
-        Need to handle disconnects client wise. We should show if a client disconnects, game state will eventually
-        remove him.
-
-        Overall properties of game (we should show these via visualizations and they should hold for decentralized system):
-            - Safety - be able to detect hackers (moving too fast or hitting/healing someone outside proximity)
-            - Network Tolerance - if client loses connection, they are removed from game
-            - Correctness - game actually works (we can move around a player in game and see actions make sense)
+        Returns:
+            Location for next step to take
         """
-        time.sleep(2)
-        logger.info("Entering main loop")
+        step = copy.deepcopy(current_location)
+        if destination.x > current_location.x:
+            step.x += 1
+        elif destination.x < current_location.x:
+            step.x -= 1
 
-        test_action = Action(type=ActionType.MOVE,
-                             move_target=self.current_location)
+        if destination.y > current_location.y:
+            step.y += 1
+        elif destination.y < current_location.y:
+            step.y -= 1
 
-        self.server.take_action(self.player_id, test_action)
+        return step
 
-        logger.info("Sanity check action OK")
-        destination = self.game.random_location()
+    time.sleep(2)
+    logger.info("Entering main loop")
 
-        while True:
-            time.sleep(0.01)
+    current_location = player.world.state.player_states[player.id].location
 
-            action = Action()
-            action.type = ActionType.MOVE
+    status = player.move(current_location)
+    assert status == StatusCode.SUCCESS
 
-            if self.current_location != destination:
-                action.move_target = next_step(self.current_location, destination)
-            else:
-                action.move_target = self.current_location
-                destination = self.game.random_location()
+    logger.info("Sanity check action OK")
+    destination = player.world.random_location()
 
-            response = self.server.take_action(self.player_id, action)
-            self.game.state = response.updated_game_state
+    while True:
+        time.sleep(0.01)
 
-            if response.status == StatusCode.SUCCESS:
-                self.current_location = self.game.state.player_states[self.player_id].location
-                logger.info("Moved to %s" % self.current_location)
+        if current_location != destination:
+            move_target = next_step(current_location, destination)
+        else:
+            move_target = current_location
+            destination = player.world.random_location()
 
-                for pid, player_state in self.game.state.player_states.iteritems():
-                    if pid != self.player_id:
-                        if self.game.within_proximity(self.current_location,
-                                                      player_state.location):
-                            logger.info("PROXIMITY WARNING with player %s" %
-                                        pid)
+        response_status = player.move(move_target)
+
+        if response_status == StatusCode.SUCCESS:
+            current_location = player.world.state.player_states[player.id].location
+            logger.info("Moved to %s" % current_location)
+
+            for pid, player_state in player.world.state.player_states.iteritems():
+                if pid != player.id:
+                    if player.world.within_proximity(current_location,
+                                                     player_state.location):
+                        logger.info("PROXIMITY WARNING with player %s" %
+                                    pid)
 
 
 if __name__ == '__main__':
-    client = CommoClient()
-    client.main_loop()
+    player = CentralizedPlayer()
+    random_move_agent(player)
