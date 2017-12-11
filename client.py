@@ -15,7 +15,7 @@ from game import Game
 from game_ui import GameRenderer
 
 from schemas.commo import CommoServer
-from schemas.commo.ttypes import Action, GameStatus, Location
+from schemas.commo.ttypes import Action, GameStatus, Location, PlayerType
 from schemas.commo.ttypes import ActionType
 from schemas.commo.ttypes import StatusCode
 
@@ -56,6 +56,13 @@ class SyncedGameStateWatcher(SyncObj):
 # Base Class that defines player interface. UI will work as long as interface is defined.
 # Decentralized players should be it's own Player type for simplicity.
 class PlayerInterf(object):
+    def __init__(self, player_type):
+        """
+        Args:
+            player_type: PlayerType
+        """
+        pass
+
     @property
     def id(self):
         """
@@ -103,11 +110,12 @@ class PlayerInterf(object):
 
 class CentralizedPlayer(PlayerInterf):
 
-    def __init__(self):
-        self.game = Game()
+    def __init__(self, player_type):
+        super(CentralizedPlayer, self).__init__(player_type)
 
+        self.game = Game()
         self.transport, self.server = connect_to_server()
-        self.player_id = self.server.join_game()
+        self.player_id = self.server.join_game(player_type)
 
         # Set up the decentralized watcher
         #self.cluster = SyncedGameStateWatcher(self.player_id)
@@ -239,13 +247,20 @@ def random_move_agent(player, renderer):
 
 @click.command()
 @click.option('--render/--no-render', default=False)
-def main(render):
-    player = CentralizedPlayer()
+@click.option('--player-type', default="RANDOM", type=click.Choice(PlayerType._NAMES_TO_VALUES.keys()))
+def main(render, player_type):
+    player_type = PlayerType._NAMES_TO_VALUES[player_type]
+
+    player = CentralizedPlayer(player_type)
 
     renderer = None
     if render:
         renderer = GameRenderer(player)
-    random_move_agent(player, renderer)
+
+    if player_type == PlayerType.RANDOM:
+        random_move_agent(player, renderer)
+    elif player_type == PlayerType.PLAYER1:
+        random_move_agent(player, renderer)
 
 
 if __name__ == '__main__':

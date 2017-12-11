@@ -1,7 +1,9 @@
 import logging
 import pygame
 
-from config import BACKGROUND, RANDOM_PLAYER_COLOR, USER_PLAYER_ID, USER_PLAYER_COLOR, PLAYER_RENDER_RADIUS
+from config import BACKGROUND, RANDOM_PLAYER_COLOR, PLAYER_RENDER_RADIUS, \
+    PLAYER1_COLOR
+from schemas.commo.ttypes import PlayerType
 
 logger = logging.getLogger("renderer")
 logger.setLevel('DEBUG')
@@ -27,10 +29,10 @@ class GameRenderer(object):
     def draw_player(self, player_state, color):
         location = player_state.location
 
-        logger.debug('Rendering location: {}'.format(location))
+        #logger.debug('Rendering location: {}'.format(location))
 
         pygame.draw.circle(self.screen,
-                           (255, 0, 0),
+                           color,
                            [location.x, location.y],
                            PLAYER_RENDER_RADIUS)
 
@@ -42,19 +44,15 @@ class GameRenderer(object):
         # Clear the screen and set the screen background
         self.screen.fill(BACKGROUND)
 
-        for pid, player_state in self.player.world.state.player_states.iteritems():
-            if pid == USER_PLAYER_ID:
-                self.draw_player(player_state, USER_PLAYER_COLOR)
-            else:
+        for _, player_state in self.player.world.state.player_states.iteritems():
+
+            logger.debug('Rendering player type: {}'.format(player_state.type))
+            if player_state.type == PlayerType.PLAYER1:
+                self.draw_player(player_state, PLAYER1_COLOR)
+            elif player_state.type == PlayerType.RANDOM:
                 self.draw_player(player_state, RANDOM_PLAYER_COLOR)
+            else:
+                raise Exception("Unsupported player type: {}".format(player_state.type))
 
         pygame.display.flip()
-
-
-"""
-    for event in pygame.event.get():  # User did something
-        if event.type == pygame.QUIT:  # If user clicked close
-            done = True  # Flag that we are done so we exit this loop
-"""
-
 

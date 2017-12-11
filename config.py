@@ -16,13 +16,11 @@ FPS = 30
 # Player
 INITIAL_HEALTH = 100
 
-USER_PLAYER_ID = 2000
-
 
 # == RENDER OPTIONS ==
 # Google colors instead of any custom ones because i have no sense of good color palettes.
 RANDOM_PLAYER_COLOR = (72, 133, 237)  # blue
-USER_PLAYER_COLOR = (60, 186, 84)     # green
+PLAYER1_COLOR = (60, 186, 84)     # green
 HACKER_PLAYER_COLOR = (219, 50, 54)   # red
 BACKGROUND = (255, 236, 179)          # light yellow
 

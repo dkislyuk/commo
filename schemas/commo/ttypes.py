@@ -31,6 +31,24 @@ class GameStatus(object):
     }
 
 
+class PlayerType(object):
+    RANDOM = 1
+    HACKER = 2
+    PLAYER1 = 3
+
+    _VALUES_TO_NAMES = {
+        1: "RANDOM",
+        2: "HACKER",
+        3: "PLAYER1",
+    }
+
+    _NAMES_TO_VALUES = {
+        "RANDOM": 1,
+        "HACKER": 2,
+        "PLAYER1": 3,
+    }
+
+
 class StatusCode(object):
     SUCCESS = 1
     ILLEGAL_ACTION = 2
@@ -142,6 +160,7 @@ class Location(object):
 class PlayerState(object):
     """
     Attributes:
+     - type
      - location
      - health
     """
@@ -150,9 +169,11 @@ class PlayerState(object):
         None,  # 0
         (1, TType.STRUCT, 'location', (Location, Location.thrift_spec), None, ),  # 1
         (2, TType.I32, 'health', None, None, ),  # 2
+        (3, TType.I32, 'type', None, None, ),  # 3
     )
 
-    def __init__(self, location=None, health=None,):
+    def __init__(self, type=None, location=None, health=None,):
+        self.type = type
         self.location = location
         self.health = health
 
@@ -165,7 +186,12 @@ class PlayerState(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
-            if fid == 1:
+            if fid == 3:
+                if ftype == TType.I32:
+                    self.type = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 1:
                 if ftype == TType.STRUCT:
                     self.location = Location()
                     self.location.read(iprot)
@@ -193,6 +219,10 @@ class PlayerState(object):
         if self.health is not None:
             oprot.writeFieldBegin('health', TType.I32, 2)
             oprot.writeI32(self.health)
+            oprot.writeFieldEnd()
+        if self.type is not None:
+            oprot.writeFieldBegin('type', TType.I32, 3)
+            oprot.writeI32(self.type)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -529,6 +559,78 @@ class ActionResponse(object):
         if self.updated_game_state is not None:
             oprot.writeFieldBegin('updated_game_state', TType.STRUCT, 2)
             self.updated_game_state.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ClockSyncResponse(object):
+    """
+    Attributes:
+     - status
+     - timestamp
+    """
+
+    thrift_spec = (
+        None,  # 0
+        (1, TType.I32, 'status', None, None, ),  # 1
+        (2, TType.I64, 'timestamp', None, None, ),  # 2
+    )
+
+    def __init__(self, status=None, timestamp=None,):
+        self.status = status
+        self.timestamp = timestamp
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, (self.__class__, self.thrift_spec))
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.status = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I64:
+                    self.timestamp = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, (self.__class__, self.thrift_spec)))
+            return
+        oprot.writeStructBegin('ClockSyncResponse')
+        if self.status is not None:
+            oprot.writeFieldBegin('status', TType.I32, 1)
+            oprot.writeI32(self.status)
+            oprot.writeFieldEnd()
+        if self.timestamp is not None:
+            oprot.writeFieldBegin('timestamp', TType.I64, 2)
+            oprot.writeI64(self.timestamp)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()

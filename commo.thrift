@@ -9,7 +9,15 @@ enum GameStatus {
     ENDED = 3
 }
 
+// Just used for rendering
+enum PlayerType {
+    RANDOM = 1
+    HACKER = 2
+    PLAYER1 = 3
+}
+
 struct PlayerState {
+    3: PlayerType type,
     1: Location location,
     2: i32 health
 }
@@ -56,7 +64,7 @@ struct ClockSyncResponse {
 
 service CommoServer {
    void ping(),
-   i32 join_game(),
+   i32 join_game(1: PlayerType type),
    StartGameResponse start_game(),
    ActionResponse take_action(1: i32 player_id, 2: Action action),
 

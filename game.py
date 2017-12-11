@@ -43,22 +43,25 @@ class Game(object):
         """
         self.game_state = state
 
-    def _initialize_player(self, player_id):
-        player_state = PlayerState(location=self.random_location(),
+    def _initialize_player(self, player_id, player_type):
+        player_state = PlayerState(type=player_type,
+                                   location=self.random_location(),
                                    health=INITIAL_HEALTH)
         self.game_state.player_states[player_id] = player_state
 
 
-    def add_player(self):
+    def add_player(self, player_type):
         """
+        Args:
+            player_type: PlayerType
         Returns: Assigned player id
         """
 
         player_id = len(self.game_state.player_states)
         # Note: shared thread state updates ok since python is runs statements sequentially
-        logger.info("Adding player %s" % player_id)
+        logger.info("Adding player %s of type %s" % (player_id, player_type))
         assert player_id not in self.game_state.player_states
-        self._initialize_player(player_id)
+        self._initialize_player(player_id, player_type)
         return player_id
 
     def start_game(self):

@@ -25,9 +25,10 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('')
     print('Functions:')
     print('  void ping()')
-    print('  i32 join_game()')
+    print('  i32 join_game(PlayerType type)')
     print('  StartGameResponse start_game()')
     print('  ActionResponse take_action(i32 player_id, Action action)')
+    print('  ClockSyncResponse clockSync(i32 clientId, i64 timestamp)')
     print('')
     sys.exit(0)
 
@@ -114,10 +115,10 @@ if cmd == 'ping':
     pp.pprint(client.ping())
 
 elif cmd == 'join_game':
-    if len(args) != 0:
-        print('join_game requires 0 args')
+    if len(args) != 1:
+        print('join_game requires 1 args')
         sys.exit(1)
-    pp.pprint(client.join_game())
+    pp.pprint(client.join_game(eval(args[0]),))
 
 elif cmd == 'start_game':
     if len(args) != 0:
@@ -130,6 +131,12 @@ elif cmd == 'take_action':
         print('take_action requires 2 args')
         sys.exit(1)
     pp.pprint(client.take_action(eval(args[0]), eval(args[1]),))
+
+elif cmd == 'clockSync':
+    if len(args) != 2:
+        print('clockSync requires 2 args')
+        sys.exit(1)
+    pp.pprint(client.clockSync(eval(args[0]), eval(args[1]),))
 
 else:
     print('Unrecognized method %s' % cmd)

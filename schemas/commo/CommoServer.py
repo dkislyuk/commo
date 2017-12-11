@@ -19,7 +19,11 @@ class Iface(object):
     def ping(self):
         pass
 
-    def join_game(self):
+    def join_game(self, type):
+        """
+        Parameters:
+         - type
+        """
         pass
 
     def start_game(self):
@@ -30,6 +34,14 @@ class Iface(object):
         Parameters:
          - player_id
          - action
+        """
+        pass
+
+    def clockSync(self, clientId, timestamp):
+        """
+        Parameters:
+         - clientId
+         - timestamp
         """
         pass
 
@@ -65,13 +77,18 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def join_game(self):
-        self.send_join_game()
+    def join_game(self, type):
+        """
+        Parameters:
+         - type
+        """
+        self.send_join_game(type)
         return self.recv_join_game()
 
-    def send_join_game(self):
+    def send_join_game(self, type):
         self._oprot.writeMessageBegin('join_game', TMessageType.CALL, self._seqid)
         args = join_game_args()
+        args.type = type
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -150,6 +167,39 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "take_action failed: unknown result")
 
+    def clockSync(self, clientId, timestamp):
+        """
+        Parameters:
+         - clientId
+         - timestamp
+        """
+        self.send_clockSync(clientId, timestamp)
+        return self.recv_clockSync()
+
+    def send_clockSync(self, clientId, timestamp):
+        self._oprot.writeMessageBegin('clockSync', TMessageType.CALL, self._seqid)
+        args = clockSync_args()
+        args.clientId = clientId
+        args.timestamp = timestamp
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_clockSync(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = clockSync_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "clockSync failed: unknown result")
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
@@ -159,6 +209,7 @@ class Processor(Iface, TProcessor):
         self._processMap["join_game"] = Processor.process_join_game
         self._processMap["start_game"] = Processor.process_start_game
         self._processMap["take_action"] = Processor.process_take_action
+        self._processMap["clockSync"] = Processor.process_clockSync
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -200,7 +251,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = join_game_result()
         try:
-            result.success = self._handler.join_game()
+            result.success = self._handler.join_game(args.type)
             msg_type = TMessageType.REPLY
         except (TTransport.TTransportException, KeyboardInterrupt, SystemExit):
             raise
@@ -247,6 +298,25 @@ class Processor(Iface, TProcessor):
             logging.exception(ex)
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
         oprot.writeMessageBegin("take_action", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_clockSync(self, seqid, iprot, oprot):
+        args = clockSync_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = clockSync_result()
+        try:
+            result.success = self._handler.clockSync(args.clientId, args.timestamp)
+            msg_type = TMessageType.REPLY
+        except (TTransport.TTransportException, KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as ex:
+            msg_type = TMessageType.EXCEPTION
+            logging.exception(ex)
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("clockSync", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -339,9 +409,18 @@ class ping_result(object):
 
 
 class join_game_args(object):
+    """
+    Attributes:
+     - type
+    """
 
     thrift_spec = (
+        None,  # 0
+        (1, TType.I32, 'type', None, None, ),  # 1
     )
+
+    def __init__(self, type=None,):
+        self.type = type
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -352,6 +431,11 @@ class join_game_args(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.type = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -362,6 +446,10 @@ class join_game_args(object):
             oprot.trans.write(oprot._fast_encode(self, (self.__class__, self.thrift_spec)))
             return
         oprot.writeStructBegin('join_game_args')
+        if self.type is not None:
+            oprot.writeFieldBegin('type', TType.I32, 1)
+            oprot.writeI32(self.type)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -652,6 +740,138 @@ class take_action_result(object):
             oprot.trans.write(oprot._fast_encode(self, (self.__class__, self.thrift_spec)))
             return
         oprot.writeStructBegin('take_action_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class clockSync_args(object):
+    """
+    Attributes:
+     - clientId
+     - timestamp
+    """
+
+    thrift_spec = (
+        None,  # 0
+        (1, TType.I32, 'clientId', None, None, ),  # 1
+        (2, TType.I64, 'timestamp', None, None, ),  # 2
+    )
+
+    def __init__(self, clientId=None, timestamp=None,):
+        self.clientId = clientId
+        self.timestamp = timestamp
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, (self.__class__, self.thrift_spec))
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I32:
+                    self.clientId = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.I64:
+                    self.timestamp = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, (self.__class__, self.thrift_spec)))
+            return
+        oprot.writeStructBegin('clockSync_args')
+        if self.clientId is not None:
+            oprot.writeFieldBegin('clientId', TType.I32, 1)
+            oprot.writeI32(self.clientId)
+            oprot.writeFieldEnd()
+        if self.timestamp is not None:
+            oprot.writeFieldBegin('timestamp', TType.I64, 2)
+            oprot.writeI64(self.timestamp)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class clockSync_result(object):
+    """
+    Attributes:
+     - success
+    """
+
+    thrift_spec = (
+        (0, TType.STRUCT, 'success', (ClockSyncResponse, ClockSyncResponse.thrift_spec), None, ),  # 0
+    )
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, (self.__class__, self.thrift_spec))
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = ClockSyncResponse()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, (self.__class__, self.thrift_spec)))
+            return
+        oprot.writeStructBegin('clockSync_result')
         if self.success is not None:
             oprot.writeFieldBegin('success', TType.STRUCT, 0)
             self.success.write(oprot)

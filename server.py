@@ -32,8 +32,8 @@ class CommoServerHandler:
     def ping(self):
         logger.info('got ping()\'ed successfuly!')
 
-    def join_game(self):
-        player_id = self.game.add_player()
+    def join_game(self, player_type):
+        player_id = self.game.add_player(player_type)
         return player_id
 
     def start_game(self):

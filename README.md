@@ -21,3 +21,7 @@ If you want to render the GameState for a client, start the client with:
 python client.py --render
 ```
 
+Choose the client type via the --player-type parameter:
+```
+python client.py --render --player-type PLAYER1
+```
