@@ -5,6 +5,7 @@ import time
 from config import BACKGROUND, RANDOM_PLAYER_COLOR, PLAYER_RENDER_RADIUS, \
     PLAYER1_COLOR, PROXIMITY_COLOR, PROXIMITY_L2_THRESHOLD, INITIAL_HEALTH
 from schemas.commo.ttypes import PlayerType
+from sprites import Pokeball, Pikachu
 
 logger = logging.getLogger("renderer")
 logger.setLevel('DEBUG')
@@ -33,19 +34,14 @@ class GameRenderer(object):
         """
         return self.player_shapes
 
-    def draw_player(self, player_state, color):
+    def draw_player(self, player_state, sprite):
         location = player_state.location
-
-        health = float(player_state.health) / self.player.world.initial_health
-        assert health <= 1.0 and health >= 0.0
-        color = tuple([health * c for c in list(color)])
 
         #logger.debug('Rendering location: {}'.format(location))
 
-        return pygame.draw.circle(self.screen,
-                                  color,
-                                  [location.x, location.y],
-                                  PLAYER_RENDER_RADIUS)
+        sprite.set_loc((location.x, location.y))
+
+        self.screen.blit(sprite.image, sprite.rect)
 
     def draw_proximity(self, location):
         pygame.draw.circle(self.screen,
@@ -61,18 +57,22 @@ class GameRenderer(object):
 
         self.player_shapes = []
         for pid, player_state in self.player.world.state.player_states.iteritems():
+            health = float(player_state.health) / self.player.world.initial_health
             if player_state.type == PlayerType.PLAYER1:
-                shape = self.draw_player(player_state, PLAYER1_COLOR)
+                sprite = Pokeball(health)
+                self.draw_player(player_state, sprite)
 
-                self.player_shapes.append((pid, shape))
+                self.player_shapes.append((pid, sprite))
 
                 if pid == self.player.id:
                     self.draw_proximity(player_state.location)
 
             elif player_state.type == PlayerType.RANDOM:
-                shape = self.draw_player(player_state, RANDOM_PLAYER_COLOR)
+                sprite = Pikachu(health)
 
-                self.player_shapes.append((pid, shape))
+                self.draw_player(player_state, sprite)
+
+                self.player_shapes.append((pid, sprite))
             else:
                 raise Exception("Unsupported player type: {}".format(player_state.type))
 
