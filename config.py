@@ -4,6 +4,9 @@ SERVER_HOST = "127.0.0.1"
 # Enter the IP address of remote host you want. Do not record it since IP should be hidden (proprietary machine)
 SERVER_THREADS = 1000
 
+DECENTALIZED = False
+
+
 # Game
 NUM_PLAYERS_TO_START = 4
 PROXIMITY_L2_THRESHOLD = 500
