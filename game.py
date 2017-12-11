@@ -25,13 +25,13 @@ class Game(object):
         # For now test with only 4 shards
         assert self.num_shards == 4
 
-        if location.x < (self.width / 2) and location.y < (self.width / 2):
+        if location.x < (self.width / 2) and location.y < (self.height / 2):
             return 0
-        elif location.x >= (self.width / 2) and location.y < (self.width / 2):
+        elif location.x >= (self.width / 2) and location.y < (self.height / 2):
             return 1
-        elif location.x < (self.width / 2) and location.y >= (self.width / 2):
+        elif location.x < (self.width / 2) and location.y >= (self.height / 2):
             return 2
-        elif location.x >= (self.width / 2) and location.y >= (self.width / 2):
+        elif location.x >= (self.width / 2) and location.y >= (self.height / 2):
             return 3
         else:
             raise Exception("Unknown location %s" % location)
