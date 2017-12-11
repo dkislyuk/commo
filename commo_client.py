@@ -147,6 +147,23 @@ class DecentralizedPlayer(PlayerInterf):
     def world(self):
         return self.game
 
+    def attack(self, target_id):
+        action = Action(type=ActionType.ATTACK,
+                        attack_target=target_id)
+
+        response = self.server.take_action(self.player_id, action)
+        self.game.state = response.updated_game_state
+        return response.status
+
+    def heal(self, target_id):
+        action = Action(type=ActionType.HEAL,
+                        heal_target=target_id)
+
+        response = self.server.take_action(self.player_id, action)
+
+        self.game.state = response.updated_game_state
+        return response.status
+
     def move(self, location):
         action = Action(type=ActionType.MOVE,
                         move_target=location)

@@ -38,6 +38,12 @@ class ShardSyncWatcher(SyncObj):
         conf = SyncObjConf(dynamicMembershipChange=False)
         super(ShardSyncWatcher, self).__init__(serverport, other_members, conf=conf)
 
+        self.__action_clock = 0
+
+    @replicated
+    def register_action(self, action):
+        self.__action_clock += 1
+
 
 class ShardServerHandler:
 
