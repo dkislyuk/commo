@@ -101,7 +101,9 @@ class CommoServerHandler:
 
         if response.status == GameStatus.STARTED:
             response.updated_game_state = self.game.state
-            response.shard_mapping = self.shard_mapping
+
+            if DECENTRALIZED:
+                response.shard_mapping = self.shard_mapping
 
         return response
 
