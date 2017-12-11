@@ -215,8 +215,8 @@ def player_agent(player, renderer):
                 mouse_pos = pygame.mouse.get_pos()
 
                 if left_mouse or right_mouse:
-                    for pid, shape in renderer.drawn_players:
-                        has_collision = shape.collidepoint(mouse_pos)
+                    for pid, sprite in renderer.drawn_players:
+                        has_collision = sprite.rect.collidepoint(mouse_pos)
 
                         if has_collision and left_mouse and (pid != player.id):
                             # right now let server deal with invalid
