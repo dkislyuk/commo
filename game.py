@@ -94,6 +94,10 @@ class Game(object):
         """
         assert player_id not in self.game_state.player_states
         self.game_state.player_states[player_id] = player_state
+        #logger.info("TRYING TO GET GAME STATE")
+        # import ipdb; ipdb.set_trace()
+        # self.game_state.player_states.set(player_id, player_state, sync=True)
+        #ogger.info("SET SYNCED GAME STATE")
 
     def remove_player(self, player_id):
         del self.game_state.player_states[player_id]

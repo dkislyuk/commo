@@ -2,7 +2,10 @@ import logging
 import time
 
 
-from pysyncobj import SyncObj, SyncObjConf, replicated
+from pysyncobj import SyncObj
+from pysyncobj import SyncObjConf
+from pysyncobj import replicated
+from pysyncobj.batteries import ReplDict
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
@@ -16,11 +19,12 @@ from game import Game
 from schemas.commo import CommoServer
 from schemas.commo.ttypes import Action
 from schemas.commo.ttypes import ActionResponse
+from schemas.commo.ttypes import ActionType
+from schemas.commo.ttypes import GameState
 from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import JoinShardResponse
 from schemas.commo.ttypes import LeaveShardResponse
 from schemas.commo.ttypes import Location
-from schemas.commo.ttypes import ActionType
 from schemas.commo.ttypes import StatusCode
 
 logging.basicConfig()
@@ -35,8 +39,12 @@ class ShardSyncWatcher(SyncObj):
         logger.info("Initializing SyncObj with serverport %s (others: %s)" %
                     (serverport, other_members))
 
+        self.replicated_game_state = ReplDict()
+
         conf = SyncObjConf(dynamicMembershipChange=False)
-        super(ShardSyncWatcher, self).__init__(serverport, other_members, conf=conf)
+        super(ShardSyncWatcher, self).__init__(
+            serverport, other_members, conf=conf,
+            consumers=[self.replicated_game_state])
 
         self.__action_clock = 0
 
@@ -113,7 +121,6 @@ class ShardServer:
             logger.info('%s is the initial leader for shard id %s' %
                         (my_serverport_str, assigned_shard_id))
 
-    def start_shard_server(self):
         host = self.my_serverport.server
         port = self.my_serverport.port
 
@@ -123,8 +130,13 @@ class ShardServer:
         tfactory = TTransport.TBufferedTransportFactory()
         pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
-        server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
-        server.setNumThreads(SERVER_THREADS)
+        self.server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
+        self.server.setNumThreads(SERVER_THREADS)
 
-        logger.info("starting shard server!")
-        server.serve()
+        # Make the game state synchronized within the RAFT server
+        shared_game_state = GameState(player_states=self.watcher.replicated_game_state)
+        #handler.sharded_game.state = shared_game_state
+
+    def start_shard_server(self):
+        logger.info("Starting shard server %s!" % self.my_serverport)
+        self.server.serve()

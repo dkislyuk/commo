@@ -1,5 +1,4 @@
 import click
-import copy
 import logging
 import pygame
 import time
@@ -18,10 +17,10 @@ from shard_server import ShardServer
 
 from schemas.commo import CommoServer
 from schemas.commo.ttypes import Action
-from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import ActionType
-from schemas.commo.ttypes import StatusCode
+from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import PlayerType
+from schemas.commo.ttypes import StatusCode
 
 
 logging.basicConfig()
@@ -143,6 +142,8 @@ class DecentralizedPlayer(PlayerInterf):
         self.current_shard.server.join_shard(self.player_id, self.current_shard_id, player_state)
         logger.info('Entered player state to initial shard server')
 
+        time.sleep(1)
+
     @property
     def id(self):
         return self.player_id
@@ -207,6 +208,8 @@ class DecentralizedPlayer(PlayerInterf):
 
             player_state = self.game.get_player_state(self.player_id)
             self.current_shard.server.join_shard(self.player_id, shard_id, player_state)
+
+            time.sleep(1)
 
 
 def start_agent(player, player_type, render):
