@@ -1,3 +1,4 @@
+import click
 import logging
 
 from thrift.transport import TSocket
@@ -5,7 +6,6 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-from config import DECENTRALIZED
 from config import SERVER_PORT
 from config import SERVER_THREADS
 from config import NUM_LEADERS_PER_SHARD
@@ -30,11 +30,13 @@ logger.setLevel('INFO')
 class CommoServerHandler:
     client_count = 0
 
-    def __init__(self):
+    def __init__(self, is_decentralized):
         self.game = Game(num_shards=NUM_SHARDS)
         self.shard_leaders_assigned = False
         self.shard_leaders_confirmed = False
         self.confirmed_initial_shard_leaders = {}
+
+        self.is_decentralized = is_decentralized
 
     def ping(self):
         logger.info('got ping()\'ed successfuly!')
@@ -86,11 +88,11 @@ class CommoServerHandler:
     def start_game(self):
         response = StartGameResponse()
 
-        if DECENTRALIZED and not self.shard_leaders_assigned:
+        if self.is_decentralized and not self.shard_leaders_assigned:
             response.status = GameStatus.WAITING_FOR_PLAYERS
             return response
 
-        if DECENTRALIZED and not self.shard_leaders_confirmed:
+        if self.is_decentralized and not self.shard_leaders_confirmed:
             response.status = GameStatus.SHARD_LEADERS_ASSIGNED
             return response
 
@@ -102,7 +104,7 @@ class CommoServerHandler:
         if response.status == GameStatus.STARTED:
             response.updated_game_state = self.game.state
 
-            if DECENTRALIZED:
+            if self.is_decentralized:
                 response.shard_mapping = self.shard_mapping
 
         return response
@@ -128,8 +130,10 @@ class CommoServerHandler:
     def join_shard(self):
         raise Exception("`join_shard` not allowed on master server!")
 
-if __name__ == '__main__':
-    handler = CommoServerHandler()
+@click.command()
+@click.option('--decentralized/--no-decentralized', default=True)
+def main(decentralized):
+    handler = CommoServerHandler(decentralized)
     processor = CommoServer.Processor(handler)
     transport = TSocket.TServerSocket(host='0.0.0.0', port=SERVER_PORT)
     tfactory = TTransport.TBufferedTransportFactory()
@@ -140,3 +144,6 @@ if __name__ == '__main__':
 
     logger.info("Starting server!")
     server.serve()
+
+if __name__ == '__main__':
+    main()

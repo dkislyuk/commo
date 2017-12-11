@@ -1,5 +1,7 @@
+import click
 import copy
 import logging
+import pygame
 import time
 
 from multiprocessing import Process
@@ -9,8 +11,9 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-from client import connect_to_master_server, PlayerInterf
+from client import connect_to_master_server, PlayerInterf, random_move_agent, player_agent
 from game import Game
+from game_ui import GameRenderer
 from shard_server import ShardServer
 
 from schemas.commo import CommoServer
@@ -22,7 +25,8 @@ from schemas.commo.ttypes import PlayerType
 
 
 logging.basicConfig()
-
+logger = logging.getLogger("commo-client")
+logger.setLevel('DEBUG')
 
 # def generate_cluster_serverport(player_id):
 #     return 'localhost:%s' % (9000 + player_id)
@@ -60,19 +64,19 @@ class ShardServerWrapper:
 
 class DecentralizedPlayer(PlayerInterf):
 
-    def __init__(self):
+    def __init__(self, player_type):
+        super(DecentralizedPlayer, self).__init__(player_type)
+
         self.game = Game()
 
         self.transport, self.server = connect_to_master_server()
-        self.player_id = self.server.join_game(PlayerType.RANDOM)
+        self.player_id = self.server.join_game(player_type)
 
         # By default, not responsible for running a shard server
         self.local_shard_server_object = None
 
         global logger
 
-        logger = logging.getLogger("commo-client-%s" % self.player_id)
-        logger.setLevel('DEBUG')
         logger.info('Joined game with player id: %s' % self.player_id)
 
         # # Set up the decentralized watcher
@@ -205,129 +209,33 @@ class DecentralizedPlayer(PlayerInterf):
             self.current_shard.server.join_shard(self.player_id, shard_id, player_state)
 
 
-def random_move_agent(player):
-    """
-    TODO:
-    Main loop should be outside of client.
-
-    We need three types of players:
-        - Random Players like what is implemented here
-        - Hacker Players that try to do illegal moves
-        - User Players which operators can control to manipulate the game manually
-
-    Need to handle disconnects client wise. We should show if a client disconnects, game state will eventually
-    remove him.
-
-    Overall properties of game (we should show these via visualizations and they should hold for decentralized system):
-        - Safety - be able to detect hackers (moving too fast or hitting/healing someone outside proximity)
-        - Network Tolerance - if client loses connection, they are removed from game
-        - Correctness - game actually works (we can move around a player in game and see actions make sense)
-    """
-
-    def next_step(current_location, destination):
-        """
-        Args:
-            current_location: Location
-            destination: Location
-
-        Returns:
-            Location for next step to take
-        """
-        step = copy.deepcopy(current_location)
-        if destination.x > current_location.x:
-            step.x += 1
-        elif destination.x < current_location.x:
-            step.x -= 1
-
-        if destination.y > current_location.y:
-            step.y += 1
-        elif destination.y < current_location.y:
-            step.y -= 1
-
-        return step
-
+def start_agent(player, player_type, render):
     time.sleep(2)
     player.initialize_location_and_shard()
 
-    current_location = player.world.state.player_states[player.id].location
+    renderer = None
+    if render:
+        pygame.init()
+        renderer = GameRenderer(player)
 
-    status = player.move(current_location)
-    assert status == StatusCode.SUCCESS
+    if player_type == PlayerType.RANDOM:
+        random_move_agent(player, renderer)
+    elif player_type == PlayerType.PLAYER1:
+        player_agent(player, renderer)
 
-    logger.info("Sanity check action OK")
-    destination = player.world.random_location()
+@click.command()
+@click.option('--render/--no-render', default=False)
+@click.option('--player-type', default="RANDOM", type=click.Choice(PlayerType._NAMES_TO_VALUES.keys()))
+def main(render, player_type):
+    player_type = PlayerType._NAMES_TO_VALUES[player_type]
 
-    logger.info("Entering main movement loop")
-
-    while True:
-        time.sleep(0.1)
-
-        if current_location != destination:
-            move_target = next_step(current_location, destination)
-        else:
-            move_target = current_location
-            destination = player.world.random_location()
-
-        response_status = player.move(move_target)
-
-        if response_status == StatusCode.SUCCESS:
-            current_location = player.world.state.player_states[player.id].location
-            logger.info("Moved to %s" % current_location)
-
-            for pid, player_state in player.world.state.player_states.iteritems():
-                if pid != player.id:
-                    if player.world.within_proximity(current_location,
-                                                     player_state.location):
-                        logger.info("PROXIMITY WARNING (to player %s)" % pid)
-
-            #             proximity_serverport = generate_cluster_serverport(pid)
-
-            #             # Will be a no-op if player already added
-            #             player.cluster.addNodeToCluster(proximity_serverport)
-
-            #             # Warning! This data may be stale, must check if you're
-            #             # synced with pid before using it.
-            #             action_log = player.cluster.get_action_log(pid)
-
-            #             if action_log and len(action_log) > 0:
-            #                 logger.info("have data from a neighbor")
-
-            # # Warning! Leader is not garaunteed to be synchronized
-            # # at this stage.
-            # current_leader = player.cluster._getLeader()
-            # if current_leader != player.cluster._getSelfNodeAddr():
-            #     # Reporting to somebody else:
-            #     logger.info("Reporting to another leader: %s" % current_leader)
-            #     #import ipdb; ipdb.set_trace()
-
-            #player.cluster
-
-            # Warning! In this stage, there may be multiple group
-            # leaders.
-
-            # # Wait until cluster has been successfully formed
-            # while True:
-            #     if player.cluster._printStatus() is None:
-            #         # need to refactor this since gameplay is
-            #         # affected
-            #         time.sleep(0.01)
-            #     else:
-            #         #assert player.cluster._getLeader() is not None
-            #         break
-
-            # # assert player.cluster._getLeader() is not None
-            # import ipdb; ipdb.set_trace()
-
-
-if __name__ == '__main__':
-    player = DecentralizedPlayer()
-
+    player = DecentralizedPlayer(player_type)
     if player.local_shard_server_object is not None:
         # We are also responsible for running a shard server, run in background
         shard_server_thread = Process(target=player.local_shard_server_object.start_shard_server)
         shard_server_thread.start()
 
-    agent_thread = Process(target=random_move_agent, args=(player,))
-    agent_thread.start()
+    start_agent(player, player_type, render)
 
-    agent_thread.join()
+if __name__ == '__main__':
+    main()
