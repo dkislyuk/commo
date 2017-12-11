@@ -1,5 +1,6 @@
 import logging
 import pygame
+import time
 
 from config import BACKGROUND, RANDOM_PLAYER_COLOR, PLAYER_RENDER_RADIUS, \
     PLAYER1_COLOR, PROXIMITY_COLOR, PROXIMITY_L2_THRESHOLD
@@ -41,6 +42,7 @@ class GameRenderer(object):
                            1)
 
     def update(self):
+        start = time.time()
         # Clear the screen and set the screen background
         self.screen.fill(BACKGROUND)
 
@@ -57,4 +59,6 @@ class GameRenderer(object):
                 raise Exception("Unsupported player type: {}".format(player_state.type))
 
         pygame.display.flip()
+
+        logger.debug("Time to draw: {}".format(time.time() - start))
 

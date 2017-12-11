@@ -6,10 +6,16 @@ Use the following to recompile thrift:
 thrift -r --gen py --out schemas commo.thrift
 ```
 
+=========================================
+
 For a simple test to start the Game server, run
 ```
 python server.py
 ```
+
+To run the server on a remote host, change the IP address in config.py
+
+=========================================
 
 A single client can be joined via
 ```

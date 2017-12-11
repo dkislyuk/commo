@@ -1,7 +1,8 @@
 # Server
-SERVER_PORT = "9090"
+SERVER_PORT = "8010"
 SERVER_HOST = "127.0.0.1"
-SERVER_THREADS = 50
+# Enter the IP address of remote host you want. Do not record it since IP should be hidden (proprietary machine)
+SERVER_THREADS = 1000
 
 # Game
 NUM_PLAYERS_TO_START = 3

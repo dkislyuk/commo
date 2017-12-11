@@ -156,7 +156,9 @@ class CentralizedPlayer(PlayerInterf):
         action = Action(type=ActionType.MOVE,
                         move_target=location)
 
+        start = time.time()
         response = self.server.take_action(self.player_id, action)
+        logger.info('Move api call time: {}'.format(time.time() - start))
         self.game.state = response.updated_game_state
         return response.status
 
@@ -208,8 +210,10 @@ def player_agent(player, renderer):
             if event.type == pygame.QUIT:
                 raise Exception("Killed rendering. Disconnecting Player")
 
+        start = time.time()
         move_target = take_step(current_location, move_events)
         response_status = player.move(move_target)
+        logger.info("Time to api: {}".format(time.time() - start))
 
         if response_status == StatusCode.SUCCESS:
             current_location = player.world.state.player_states[player.id].location

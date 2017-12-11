@@ -67,7 +67,7 @@ class CommoServerHandler:
 if __name__ == '__main__':
     handler = CommoServerHandler()
     processor = CommoServer.Processor(handler)
-    transport = TSocket.TServerSocket(host='127.0.0.1', port=SERVER_PORT)
+    transport = TSocket.TServerSocket(host='0.0.0.0', port=SERVER_PORT)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
