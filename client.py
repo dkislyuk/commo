@@ -162,6 +162,26 @@ class CentralizedPlayer(PlayerInterf):
         self.game.state = response.updated_game_state
         return response.status
 
+    def attack(self, target_id):
+        action = Action(type=ActionType.ATTACK,
+                        attack_target=target_id)
+
+        start = time.time()
+        response = self.server.take_action(self.player_id, action)
+        logger.info('Attack api call time: {}'.format(time.time() - start))
+        self.game.state = response.updated_game_state
+        return response.status
+
+    def heal(self, target_id):
+        action = Action(type=ActionType.HEAL,
+                        heal_target=target_id)
+
+        start = time.time()
+        response = self.server.take_action(self.player_id, action)
+        logger.info('Heal api call time: {}'.format(time.time() - start))
+        self.game.state = response.updated_game_state
+        return response.status
+
 
 def take_step(current_location, move_events):
     """
@@ -205,11 +225,26 @@ def player_agent(player, renderer):
         # limit while loop to max FPS loops / second
         clock.tick(FPS)
 
-        move_events = pygame.key.get_pressed()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 raise Exception("Killed rendering. Disconnecting Player")
 
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                left_mouse, _, right_mouse = pygame.mouse.get_pressed()
+                mouse_pos = pygame.mouse.get_pos()
+
+                if left_mouse or right_mouse:
+                    for pid, shape in renderer.drawn_players:
+                        has_collision = shape.collidepoint(mouse_pos)
+
+                        if has_collision and left_mouse and (pid != player.id):
+                            # right now let server deal with invalid
+                            player.attack(pid)
+
+                        if has_collision and right_mouse:
+                            player.heal(pid)
+
+        move_events = pygame.key.get_pressed()
         start = time.time()
         move_target = take_step(current_location, move_events)
         response_status = player.move(move_target)

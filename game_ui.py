@@ -3,7 +3,7 @@ import pygame
 import time
 
 from config import BACKGROUND, RANDOM_PLAYER_COLOR, PLAYER_RENDER_RADIUS, \
-    PLAYER1_COLOR, PROXIMITY_COLOR, PROXIMITY_L2_THRESHOLD
+    PLAYER1_COLOR, PROXIMITY_COLOR, PROXIMITY_L2_THRESHOLD, INITIAL_HEALTH
 from schemas.commo.ttypes import PlayerType
 
 logger = logging.getLogger("renderer")
@@ -24,15 +24,28 @@ class GameRenderer(object):
 
         pygame.display.set_caption("CS244b Game")
 
+        self.player_shapes = []
+
+    @property
+    def drawn_players(self):
+        """
+        Returns: returns player shapes so collision detection can be done
+        """
+        return self.player_shapes
+
     def draw_player(self, player_state, color):
         location = player_state.location
 
+        health = float(player_state.health) / self.player.world.initial_health
+        assert health <= 1.0 and health >= 0.0
+        color = tuple([health * c for c in list(color)])
+
         #logger.debug('Rendering location: {}'.format(location))
 
-        pygame.draw.circle(self.screen,
-                           color,
-                           [location.x, location.y],
-                           PLAYER_RENDER_RADIUS)
+        return pygame.draw.circle(self.screen,
+                                  color,
+                                  [location.x, location.y],
+                                  PLAYER_RENDER_RADIUS)
 
     def draw_proximity(self, location):
         pygame.draw.circle(self.screen,
@@ -46,15 +59,20 @@ class GameRenderer(object):
         # Clear the screen and set the screen background
         self.screen.fill(BACKGROUND)
 
+        self.player_shapes = []
         for pid, player_state in self.player.world.state.player_states.iteritems():
             if player_state.type == PlayerType.PLAYER1:
-                self.draw_player(player_state, PLAYER1_COLOR)
+                shape = self.draw_player(player_state, PLAYER1_COLOR)
+
+                self.player_shapes.append((pid, shape))
 
                 if pid == self.player.id:
                     self.draw_proximity(player_state.location)
 
             elif player_state.type == PlayerType.RANDOM:
-                self.draw_player(player_state, RANDOM_PLAYER_COLOR)
+                shape = self.draw_player(player_state, RANDOM_PLAYER_COLOR)
+
+                self.player_shapes.append((pid, shape))
             else:
                 raise Exception("Unsupported player type: {}".format(player_state.type))
 

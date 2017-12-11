@@ -21,6 +21,10 @@ class Game(object):
         self.game_status = GameStatus.WAITING_FOR_PLAYERS
 
     @property
+    def initial_health(self):
+        return INITIAL_HEALTH
+
+    @property
     def status(self):
         """
         Returns: GameStatus state
@@ -101,8 +105,12 @@ class Game(object):
             StatusCode
         """
         # TODO: determine what is an invalid move
-        self.game_state.player_states[player_id].location = target
+        player = self.game_state.player_states[player_id]
 
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
+        player.location = target
         logger.info("Player %s moved to %s" % (player_id, target))
 
         return StatusCode.SUCCESS
@@ -119,6 +127,9 @@ class Game(object):
         """
         # TODO: determine what is an invalid move better
         player = self.game_state.player_states[player_id]
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
         target = self.game_state.player_states[target_id]
 
         if self.within_proximity(player.location, target.location):
@@ -141,6 +152,9 @@ class Game(object):
         """
         # TODO: determine what is an invalid move better
         player = self.game_state.player_states[player_id]
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
         target = self.game_state.player_states[target_id]
 
         if self.within_proximity(player.location, target.location):
