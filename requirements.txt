@@ -1,3 +1,4 @@
 thrift==0.10.0
-pysyncobj
-click
+pysyncobj==0.3.3
+pygame==1.9.3
+click==6.7

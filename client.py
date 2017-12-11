@@ -1,16 +1,18 @@
+import click
 import copy
 import logging
 import time
 
-
+import pygame
 from pysyncobj import SyncObj, SyncObjConf
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
-from config import SERVER_HOST, SERVER_PORT
+from config import SERVER_HOST, SERVER_PORT, FPS
 from game import Game
+from game_ui import GameRenderer
 
 from schemas.commo import CommoServer
 from schemas.commo.ttypes import Action, GameStatus, Location
@@ -108,7 +110,7 @@ class CentralizedPlayer(PlayerInterf):
         self.player_id = self.server.join_game()
 
         # Set up the decentralized watcher
-        self.cluster = SyncedGameStateWatcher(self.player_id)
+        #self.cluster = SyncedGameStateWatcher(self.player_id)
 
         logger = logging.getLogger("commo-client-%s" % self.player_id)
         logger.setLevel('DEBUG')
@@ -151,7 +153,30 @@ class CentralizedPlayer(PlayerInterf):
         return response.status
 
 
-def random_move_agent(player):
+def next_step(current_location, destination):
+    """
+    Args:
+        current_location: Location
+        destination: Location
+
+    Returns:
+        Location for next step to take
+    """
+    step = copy.deepcopy(current_location)
+    if destination.x > current_location.x:
+        step.x += 1
+    elif destination.x < current_location.x:
+        step.x -= 1
+
+    if destination.y > current_location.y:
+        step.y += 1
+    elif destination.y < current_location.y:
+        step.y -= 1
+
+    return step
+
+
+def random_move_agent(player, renderer):
     """
     TODO:
     Main loop should be outside of client.
@@ -170,28 +195,6 @@ def random_move_agent(player):
         - Correctness - game actually works (we can move around a player in game and see actions make sense)
     """
 
-    def next_step(current_location, destination):
-        """
-        Args:
-            current_location: Location
-            destination: Location
-
-        Returns:
-            Location for next step to take
-        """
-        step = copy.deepcopy(current_location)
-        if destination.x > current_location.x:
-            step.x += 1
-        elif destination.x < current_location.x:
-            step.x -= 1
-
-        if destination.y > current_location.y:
-            step.y += 1
-        elif destination.y < current_location.y:
-            step.y -= 1
-
-        return step
-
     time.sleep(2)
     logger.info("Entering main loop")
 
@@ -203,8 +206,10 @@ def random_move_agent(player):
     logger.info("Sanity check action OK")
     destination = player.world.random_location()
 
+    clock = pygame.time.Clock()
     while True:
-        time.sleep(0.01)
+        # limit while loop to max FPS loops / second
+        clock.tick(FPS)
 
         if current_location != destination:
             move_target = next_step(current_location, destination)
@@ -225,11 +230,23 @@ def random_move_agent(player):
                         logger.info("PROXIMITY WARNING with player %s" %
                                     pid)
 
-                        proximity_serverport = generate_cluster_serverport(pid)
-                        player.cluster.addNodeToCluster(proximity_serverport)
-                        import ipdb; ipdb.set_trace()
+                        #proximity_serverport = generate_cluster_serverport(pid)
+                        #player.cluster.addNodeToCluster(proximity_serverport)
+                        #import ipdb; ipdb.set_trace()
+
+        if renderer:
+            renderer.update()
+
+@click.command()
+@click.option('--render/--no-render', default=False)
+def main(render):
+    player = CentralizedPlayer()
+
+    renderer = None
+    if render:
+        renderer = GameRenderer(player)
+    random_move_agent(player, renderer)
 
 
 if __name__ == '__main__':
-    player = CentralizedPlayer()
-    random_move_agent(player)
+    main()
