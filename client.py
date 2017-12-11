@@ -21,7 +21,8 @@ from schemas.commo.ttypes import StatusCode
 
 
 logging.basicConfig()
-
+logger = logging.getLogger("client")
+logger.setLevel('INFO')
 
 def connect_to_master_server():
     # Make socket
@@ -104,10 +105,7 @@ class CentralizedPlayer(PlayerInterf):
         # Set up the decentralized watcher
         #self.cluster = SyncedGameStateWatcher(self.player_id)
 
-        logger = logging.getLogger("commo-client-%s" % self.player_id)
-        logger.setLevel('INFO')
         logger.info('Joined game with player id: %s' % self.player_id)
-        global logger
 
         # Wait until game begins
         while True:
@@ -194,7 +192,6 @@ def take_step(current_location, move_events):
 def player_agent(player, renderer):
     assert renderer, "Must have rendering enabled for player agent"
 
-    time.sleep(2)
     logger.info("Entering main loop")
 
     current_location = player.world.state.player_states[player.id].location
@@ -283,7 +280,7 @@ def random_move_agent(player, renderer):
         - Correctness - game actually works (we can move around a player in game and see actions make sense)
     """
 
-    time.sleep(2)
+
     logger.info("Entering main loop")
 
     current_location = player.world.state.player_states[player.id].location
@@ -333,6 +330,8 @@ def main(render, player_type):
     if render:
         pygame.init()
         renderer = GameRenderer(player)
+
+    time.sleep(2)
 
     if player_type == PlayerType.RANDOM:
         random_move_agent(player, renderer)
