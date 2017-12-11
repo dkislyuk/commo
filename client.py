@@ -97,12 +97,8 @@ class CentralizedPlayer(PlayerInterf):
     def __init__(self, player_type):
         super(CentralizedPlayer, self).__init__(player_type)
 
-        self.transport, self.server = connect_to_master_server()
-        self.player_id = self.server.join_game()
-
-        global logger
         self.game = Game()
-        self.transport, self.server = connect_to_server()
+        self.transport, self.server = connect_to_master_server()
         self.player_id = self.server.join_game(player_type)
 
         # Set up the decentralized watcher
@@ -111,6 +107,7 @@ class CentralizedPlayer(PlayerInterf):
         logger = logging.getLogger("commo-client-%s" % self.player_id)
         logger.setLevel('INFO')
         logger.info('Joined game with player id: %s' % self.player_id)
+        global logger
 
         # Wait until game begins
         while True:
