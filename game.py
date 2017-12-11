@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from config import GAME_HEIGHT, PROXIMITY_THRESHOLD, INITIAL_HEALTH, NUM_PLAYERS_TO_START, ATTACK_STRENGTH, \
+from config import GAME_HEIGHT, PROXIMITY_L2_THRESHOLD, INITIAL_HEALTH, NUM_PLAYERS_TO_START, ATTACK_STRENGTH, \
     HEAL_STRENGTH
 from config import GAME_WIDTH
 from schemas.commo.ttypes import Location, GameState, GameStatus, PlayerState, StatusCode
@@ -87,7 +87,7 @@ class Game(object):
     def within_proximity(self, loc1, loc2):
         l2_dist = np.linalg.norm(np.array([loc1.x, loc1.y]) - np.array([loc2.x, loc2.y]))
 
-        return l2_dist <= PROXIMITY_THRESHOLD
+        return l2_dist <= PROXIMITY_L2_THRESHOLD
 
 
     ### ============== MAIN ACTION METHODS ======================

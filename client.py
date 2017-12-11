@@ -121,7 +121,7 @@ class CentralizedPlayer(PlayerInterf):
         #self.cluster = SyncedGameStateWatcher(self.player_id)
 
         logger = logging.getLogger("commo-client-%s" % self.player_id)
-        logger.setLevel('DEBUG')
+        logger.setLevel('INFO')
         logger.info('Joined game with player id: %s' % self.player_id)
         global logger
 
@@ -159,6 +159,63 @@ class CentralizedPlayer(PlayerInterf):
         response = self.server.take_action(self.player_id, action)
         self.game.state = response.updated_game_state
         return response.status
+
+
+def take_step(current_location, move_events):
+    """
+    Args:
+        current_location: Location
+        move_events:  list containing possible [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
+
+    Returns:
+        Location to move to
+
+    """
+    step = copy.deepcopy(current_location)
+
+    if move_events[pygame.K_UP]:
+        step.y -= 1
+    if move_events[pygame.K_DOWN]:
+        step.y += 1
+    if move_events[pygame.K_LEFT]:
+        step.x -= 1
+    if move_events[pygame.K_RIGHT]:
+        step.x += 1
+
+    return step
+
+
+def player_agent(player, renderer):
+    assert renderer, "Must have rendering enabled for player agent"
+
+    time.sleep(2)
+    logger.info("Entering main loop")
+
+    current_location = player.world.state.player_states[player.id].location
+
+    status = player.move(current_location)
+    assert status == StatusCode.SUCCESS
+
+    logger.info("Sanity check action OK")
+
+    clock = pygame.time.Clock()
+    while True:
+        # limit while loop to max FPS loops / second
+        clock.tick(FPS)
+
+        move_events = pygame.key.get_pressed()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                raise Exception("Killed rendering. Disconnecting Player")
+
+        move_target = take_step(current_location, move_events)
+        response_status = player.move(move_target)
+
+        if response_status == StatusCode.SUCCESS:
+            current_location = player.world.state.player_states[player.id].location
+            logger.info("Moved to %s" % current_location)
+
+        renderer.update()
 
 
 def next_step(current_location, destination):
@@ -219,6 +276,12 @@ def random_move_agent(player, renderer):
         # limit while loop to max FPS loops / second
         clock.tick(FPS)
 
+        if renderer:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    raise Exception("Killed rendering. Disconnecting Player")
+
+
         if current_location != destination:
             move_target = next_step(current_location, destination)
         else:
@@ -230,17 +293,6 @@ def random_move_agent(player, renderer):
         if response_status == StatusCode.SUCCESS:
             current_location = player.world.state.player_states[player.id].location
             logger.info("Moved to %s" % current_location)
-
-            for pid, player_state in player.world.state.player_states.iteritems():
-                if pid != player.id:
-                    if player.world.within_proximity(current_location,
-                                                     player_state.location):
-                        logger.info("PROXIMITY WARNING with player %s" %
-                                    pid)
-
-                        #proximity_serverport = generate_cluster_serverport(pid)
-                        #player.cluster.addNodeToCluster(proximity_serverport)
-                        #import ipdb; ipdb.set_trace()
 
         if renderer:
             renderer.update()
@@ -255,12 +307,13 @@ def main(render, player_type):
 
     renderer = None
     if render:
+        pygame.init()
         renderer = GameRenderer(player)
 
     if player_type == PlayerType.RANDOM:
         random_move_agent(player, renderer)
     elif player_type == PlayerType.PLAYER1:
-        random_move_agent(player, renderer)
+        player_agent(player, renderer)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ import logging
 import pygame
 
 from config import BACKGROUND, RANDOM_PLAYER_COLOR, PLAYER_RENDER_RADIUS, \
-    PLAYER1_COLOR
+    PLAYER1_COLOR, PROXIMITY_COLOR, PROXIMITY_L2_THRESHOLD
 from schemas.commo.ttypes import PlayerType
 
 logger = logging.getLogger("renderer")
@@ -14,9 +14,6 @@ class GameRenderer(object):
         Args:
             player: PlayerInterf instance
         """
-
-        pygame.init()
-
         self.player = player
 
         # Set the height and width of the screen
@@ -36,19 +33,24 @@ class GameRenderer(object):
                            [location.x, location.y],
                            PLAYER_RENDER_RADIUS)
 
-    def update(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                raise Exception("Killed rendering. Disconnecting Player")
+    def draw_proximity(self, location):
+        pygame.draw.circle(self.screen,
+                           PROXIMITY_COLOR,
+                           [location.x, location.y],
+                           PROXIMITY_L2_THRESHOLD,
+                           1)
 
+    def update(self):
         # Clear the screen and set the screen background
         self.screen.fill(BACKGROUND)
 
-        for _, player_state in self.player.world.state.player_states.iteritems():
-
-            logger.debug('Rendering player type: {}'.format(player_state.type))
+        for pid, player_state in self.player.world.state.player_states.iteritems():
             if player_state.type == PlayerType.PLAYER1:
                 self.draw_player(player_state, PLAYER1_COLOR)
+
+                if pid == self.player.id:
+                    self.draw_proximity(player_state.location)
+
             elif player_state.type == PlayerType.RANDOM:
                 self.draw_player(player_state, RANDOM_PLAYER_COLOR)
             else:
