@@ -5,7 +5,7 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 
-from config import DECENTALIZED
+from config import DECENTRALIZED
 from config import SERVER_PORT
 from config import SERVER_THREADS
 from config import NUM_LEADERS_PER_SHARD
@@ -86,11 +86,11 @@ class CommoServerHandler:
     def start_game(self):
         response = StartGameResponse()
 
-        if DECENTALIZED and not self.shard_leaders_assigned:
+        if DECENTRALIZED and not self.shard_leaders_assigned:
             response.status = GameStatus.WAITING_FOR_PLAYERS
             return response
 
-        if DECENTALIZED and not self.shard_leaders_confirmed:
+        if DECENTRALIZED and not self.shard_leaders_confirmed:
             response.status = GameStatus.SHARD_LEADERS_ASSIGNED
             return response
 

@@ -4,7 +4,7 @@ SERVER_HOST = "127.0.0.1"
 # Enter the IP address of remote host you want. Do not record it since IP should be hidden (proprietary machine)
 SERVER_THREADS = 1000
 
-DECENTALIZED = False
+DECENTRALIZED = False
 
 
 # Game
