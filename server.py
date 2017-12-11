@@ -38,8 +38,8 @@ class CommoServerHandler:
     def ping(self):
         logger.info('got ping()\'ed successfuly!')
 
-    def join_game(self):
-        player_id = self.game.create_player()
+    def join_game(self, player_type):
+        player_id = self.game.create_player(player_type)
         return player_id
 
     def get_shard_assignments(self):
@@ -128,7 +128,7 @@ class CommoServerHandler:
 if __name__ == '__main__':
     handler = CommoServerHandler()
     processor = CommoServer.Processor(handler)
-    transport = TSocket.TServerSocket(host='127.0.0.1', port=SERVER_PORT)
+    transport = TSocket.TServerSocket(host='0.0.0.0', port=SERVER_PORT)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 

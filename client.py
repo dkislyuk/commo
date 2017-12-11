@@ -1,19 +1,21 @@
+import click
 import copy
 import logging
 import time
 
 
-from pysyncobj import SyncObj, SyncObjConf, replicated
+import pygame
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
-from config import SERVER_HOST, SERVER_PORT
+from config import SERVER_HOST, SERVER_PORT, FPS
 from game import Game
+from game_ui import GameRenderer
 
 from schemas.commo import CommoServer
-from schemas.commo.ttypes import Action, GameStatus, Location
+from schemas.commo.ttypes import Action, GameStatus, Location, PlayerType
 from schemas.commo.ttypes import ActionType
 from schemas.commo.ttypes import StatusCode
 
@@ -38,6 +40,13 @@ def connect_to_master_server():
 # Base Class that defines player interface. UI will work as long as interface is defined.
 # Decentralized players should be it's own Player type for simplicity.
 class PlayerInterf(object):
+    def __init__(self, player_type):
+        """
+        Args:
+            player_type: PlayerType
+        """
+        pass
+
     @property
     def id(self):
         """
@@ -85,16 +94,22 @@ class PlayerInterf(object):
 
 class CentralizedPlayer(PlayerInterf):
 
-    def __init__(self):
-        self.game = Game()
+    def __init__(self, player_type):
+        super(CentralizedPlayer, self).__init__(player_type)
 
         self.transport, self.server = connect_to_master_server()
         self.player_id = self.server.join_game()
 
         global logger
+        self.game = Game()
+        self.transport, self.server = connect_to_server()
+        self.player_id = self.server.join_game(player_type)
+
+        # Set up the decentralized watcher
+        #self.cluster = SyncedGameStateWatcher(self.player_id)
 
         logger = logging.getLogger("commo-client-%s" % self.player_id)
-        logger.setLevel('DEBUG')
+        logger.setLevel('INFO')
         logger.info('Joined game with player id: %s' % self.player_id)
 
         # Wait until game begins
@@ -128,12 +143,131 @@ class CentralizedPlayer(PlayerInterf):
         action = Action(type=ActionType.MOVE,
                         move_target=location)
 
+        start = time.time()
         response = self.server.take_action(self.player_id, action)
+        logger.info('Move api call time: {}'.format(time.time() - start))
+        self.game.state = response.updated_game_state
+        return response.status
+
+    def attack(self, target_id):
+        action = Action(type=ActionType.ATTACK,
+                        attack_target=target_id)
+
+        start = time.time()
+        response = self.server.take_action(self.player_id, action)
+        logger.info('Attack api call time: {}'.format(time.time() - start))
+        self.game.state = response.updated_game_state
+        return response.status
+
+    def heal(self, target_id):
+        action = Action(type=ActionType.HEAL,
+                        heal_target=target_id)
+
+        start = time.time()
+        response = self.server.take_action(self.player_id, action)
+        logger.info('Heal api call time: {}'.format(time.time() - start))
         self.game.state = response.updated_game_state
         return response.status
 
 
-def random_move_agent(player):
+def take_step(current_location, move_events):
+    """
+    Args:
+        current_location: Location
+        move_events:  list containing possible [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT]
+
+    Returns:
+        Location to move to
+
+    """
+    step = copy.deepcopy(current_location)
+
+    if move_events[pygame.K_UP]:
+        step.y -= 1
+    if move_events[pygame.K_DOWN]:
+        step.y += 1
+    if move_events[pygame.K_LEFT]:
+        step.x -= 1
+    if move_events[pygame.K_RIGHT]:
+        step.x += 1
+
+    return step
+
+
+def player_agent(player, renderer):
+    assert renderer, "Must have rendering enabled for player agent"
+
+    time.sleep(2)
+    logger.info("Entering main loop")
+
+    current_location = player.world.state.player_states[player.id].location
+
+    status = player.move(current_location)
+    assert status == StatusCode.SUCCESS
+
+    logger.info("Sanity check action OK")
+
+    clock = pygame.time.Clock()
+    while True:
+        # limit while loop to max FPS loops / second
+        clock.tick(FPS)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                raise Exception("Killed rendering. Disconnecting Player")
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                left_mouse, _, right_mouse = pygame.mouse.get_pressed()
+                mouse_pos = pygame.mouse.get_pos()
+
+                if left_mouse or right_mouse:
+                    for pid, shape in renderer.drawn_players:
+                        has_collision = shape.collidepoint(mouse_pos)
+
+                        if has_collision and left_mouse and (pid != player.id):
+                            # right now let server deal with invalid
+                            player.attack(pid)
+
+                        if has_collision and right_mouse:
+                            player.heal(pid)
+
+        move_events = pygame.key.get_pressed()
+        start = time.time()
+        move_target = take_step(current_location, move_events)
+        response_status = player.move(move_target)
+        logger.info("Time to api: {}".format(time.time() - start))
+
+        if response_status == StatusCode.SUCCESS:
+            current_location = player.world.state.player_states[player.id].location
+            logger.info("Moved to %s" % current_location)
+
+        renderer.update()
+
+
+def next_step(current_location, destination):
+    """
+    Args:
+        current_location: Location
+        destination: Location
+
+    Returns:
+        Location for next step to take
+    """
+    step = copy.deepcopy(current_location)
+    if destination.x > current_location.x:
+        step.x += 1
+    elif destination.x < current_location.x:
+        step.x -= 1
+
+    if destination.y > current_location.y:
+        step.y += 1
+    elif destination.y < current_location.y:
+        step.y -= 1
+
+    return step
+
+
+def random_move_agent(player, renderer):
     """
     TODO:
     Main loop should be outside of client.
@@ -152,28 +286,6 @@ def random_move_agent(player):
         - Correctness - game actually works (we can move around a player in game and see actions make sense)
     """
 
-    def next_step(current_location, destination):
-        """
-        Args:
-            current_location: Location
-            destination: Location
-
-        Returns:
-            Location for next step to take
-        """
-        step = copy.deepcopy(current_location)
-        if destination.x > current_location.x:
-            step.x += 1
-        elif destination.x < current_location.x:
-            step.x -= 1
-
-        if destination.y > current_location.y:
-            step.y += 1
-        elif destination.y < current_location.y:
-            step.y -= 1
-
-        return step
-
     time.sleep(2)
     logger.info("Entering main loop")
 
@@ -185,8 +297,16 @@ def random_move_agent(player):
     logger.info("Sanity check action OK")
     destination = player.world.random_location()
 
+    clock = pygame.time.Clock()
     while True:
-        time.sleep(0.01)
+        # limit while loop to max FPS loops / second
+        clock.tick(FPS)
+
+        if renderer:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    raise Exception("Killed rendering. Disconnecting Player")
+
 
         if current_location != destination:
             move_target = next_step(current_location, destination)
@@ -200,6 +320,27 @@ def random_move_agent(player):
             current_location = player.world.state.player_states[player.id].location
             logger.info("Moved to %s" % current_location)
 
+        if renderer:
+            renderer.update()
+
+
+@click.command()
+@click.option('--render/--no-render', default=False)
+@click.option('--player-type', default="RANDOM", type=click.Choice(PlayerType._NAMES_TO_VALUES.keys()))
+def main(render, player_type):
+    player_type = PlayerType._NAMES_TO_VALUES[player_type]
+
+    player = CentralizedPlayer(player_type)
+
+    renderer = None
+    if render:
+        pygame.init()
+        renderer = GameRenderer(player)
+
+    if player_type == PlayerType.RANDOM:
+        random_move_agent(player, renderer)
+    elif player_type == PlayerType.PLAYER1:
+        player_agent(player, renderer)
+
 if __name__ == '__main__':
-    player = CentralizedPlayer()
-    random_move_agent(player)
+    main()

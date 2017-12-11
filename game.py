@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 
-from config import GAME_HEIGHT, PROXIMITY_THRESHOLD, INITIAL_HEALTH, NUM_PLAYERS_TO_START, ATTACK_STRENGTH, \
+from config import GAME_HEIGHT, PROXIMITY_L2_THRESHOLD, INITIAL_HEALTH, NUM_PLAYERS_TO_START, ATTACK_STRENGTH, \
     HEAL_STRENGTH
 from config import GAME_WIDTH
 from schemas.commo.ttypes import Location, GameState, GameStatus, PlayerState, StatusCode
@@ -39,6 +39,10 @@ class Game(object):
             raise Exception("Unknown location %s" % location)
 
     @property
+    def initial_health(self):
+        return INITIAL_HEALTH
+
+    @property
     def status(self):
         """
         Returns: GameStatus state
@@ -64,21 +68,24 @@ class Game(object):
     def num_players(self):
         return len(self.game_state.player_states)
 
-    def _initialize_player(self, player_id):
-        player_state = PlayerState(location=self.random_location(),
+    def _initialize_player(self, player_id, player_type):
+        player_state = PlayerState(type=player_type,
+                                   location=self.random_location(),
                                    health=INITIAL_HEALTH)
         self.game_state.player_states[player_id] = player_state
 
-    def create_player(self):
+    def create_player(self, player_type):
         """
+        Args:
+            player_type: PlayerType
         Returns: Assigned player id
         """
 
         player_id = len(self.game_state.player_states)
         # Note: shared thread state updates ok since python is runs statements sequentially
-        logger.info("Adding player %s" % player_id)
+        logger.info("Adding player %s of type %s" % (player_id, player_type))
         assert player_id not in self.game_state.player_states
-        self._initialize_player(player_id)
+        self._initialize_player(player_id, player_type)
         return player_id
 
     def add_player(self, player_id, player_state):
@@ -118,7 +125,7 @@ class Game(object):
     def within_proximity(self, loc1, loc2):
         l2_dist = np.linalg.norm(np.array([loc1.x, loc1.y]) - np.array([loc2.x, loc2.y]))
 
-        return l2_dist <= PROXIMITY_THRESHOLD
+        return l2_dist <= PROXIMITY_L2_THRESHOLD
 
 
     ### ============== MAIN ACTION METHODS ======================
@@ -132,8 +139,12 @@ class Game(object):
             StatusCode
         """
         # TODO: determine what is an invalid move
-        self.game_state.player_states[player_id].location = target
+        player = self.game_state.player_states[player_id]
 
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
+        player.location = target
         logger.info("Player %s moved to %s" % (player_id, target))
 
         return StatusCode.SUCCESS
@@ -150,6 +161,9 @@ class Game(object):
         """
         # TODO: determine what is an invalid move better
         player = self.game_state.player_states[player_id]
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
         target = self.game_state.player_states[target_id]
 
         if self.within_proximity(player.location, target.location):
@@ -172,6 +186,9 @@ class Game(object):
         """
         # TODO: determine what is an invalid move better
         player = self.game_state.player_states[player_id]
+        if player.health <= 0.0:
+            return StatusCode.ILLEGAL_ACTION
+
         target = self.game_state.player_states[target_id]
 
         if self.within_proximity(player.location, target.location):

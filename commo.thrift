@@ -11,7 +11,15 @@ enum GameStatus {
     ENDED = 4
 }
 
+// Just used for rendering
+enum PlayerType {
+    RANDOM = 1
+    HACKER = 2
+    PLAYER1 = 3
+}
+
 struct PlayerState {
+    3: PlayerType type,
     1: Location location,
     2: i32 health
 }
@@ -78,7 +86,7 @@ struct JoinShardResponse {
 
 service CommoServer {
    void ping(),
-   i32 join_game(),
+   i32 join_game(1: PlayerType type),
 
    ShardLeaderAssignmentResponse get_shard_assignments(),
    void confirm_shard_leader(1: i32 player_id, 2: i32 shard_id),
