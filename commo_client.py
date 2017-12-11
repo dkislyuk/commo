@@ -151,7 +151,7 @@ class DecentralizedPlayer(PlayerInterf):
         action = Action(type=ActionType.ATTACK,
                         attack_target=target_id)
 
-        response = self.server.take_action(self.player_id, action)
+        response = self.current_shard.server.take_action(self.player_id, action)
         self.game.state = response.updated_game_state
         return response.status
 
@@ -159,7 +159,7 @@ class DecentralizedPlayer(PlayerInterf):
         action = Action(type=ActionType.HEAL,
                         heal_target=target_id)
 
-        response = self.server.take_action(self.player_id, action)
+        response = self.current_shard.server.take_action(self.player_id, action)
 
         self.game.state = response.updated_game_state
         return response.status
