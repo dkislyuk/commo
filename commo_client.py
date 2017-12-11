@@ -18,6 +18,7 @@ from schemas.commo.ttypes import Action
 from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import ActionType
 from schemas.commo.ttypes import StatusCode
+from schemas.commo.ttypes import PlayerType
 
 
 logging.basicConfig()
@@ -63,7 +64,7 @@ class DecentralizedPlayer(PlayerInterf):
         self.game = Game()
 
         self.transport, self.server = connect_to_master_server()
-        self.player_id = self.server.join_game()
+        self.player_id = self.server.join_game(PlayerType.RANDOM)
 
         # By default, not responsible for running a shard server
         self.local_shard_server_object = None
