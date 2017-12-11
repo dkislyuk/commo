@@ -22,8 +22,6 @@ class Game(object):
         self.game_status = GameStatus.WAITING_FOR_PLAYERS
 
     def location_to_shard_id(self, location):
-        #return 0
-
         # For now test with only 4 shards
         assert self.num_shards == 4
 

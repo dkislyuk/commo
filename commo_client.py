@@ -24,23 +24,7 @@ from schemas.commo.ttypes import StatusCode
 
 
 logging.basicConfig()
-logger = logging.getLogger("commo-client")
-logger.setLevel('DEBUG')
 
-# def generate_cluster_serverport(player_id):
-#     return 'localhost:%s' % (9000 + player_id)
-#     self.action_log = {}
-#     self.action_log[client_id] = []
-
-# @replicated
-# def broadcast_action(self, client_id, action):
-#     logger.info("Writing to distributed action log: %s" % action)
-#     assert client_id in self.action_log
-#     self.action_log[client_id].append(action)
-
-# def get_action_log(self, client_id):
-#     # This needs to be versioned somehow
-#     return self.action_log.get(client_id)
 
 class ShardServerWrapper:
     server = None
@@ -75,11 +59,9 @@ class DecentralizedPlayer(PlayerInterf):
         self.local_shard_server_object = None
 
         global logger
-
+        logger = logging.getLogger("commo-client-%s" % self.player_id)
+        logger.setLevel('DEBUG')
         logger.info('Joined game with player id: %s' % self.player_id)
-
-        # # Set up the decentralized watcher
-        # self.cluster = SyncedGameStateWatcher(self.player_id)
 
         # Wait for potential shard assignment
         waiting_for_shard_assignments = True
@@ -141,8 +123,6 @@ class DecentralizedPlayer(PlayerInterf):
         player_state = self.game.get_player_state(self.player_id)
         self.current_shard.server.join_shard(self.player_id, self.current_shard_id, player_state)
         logger.info('Entered player state to initial shard server')
-
-        time.sleep(1)
 
     @property
     def id(self):
@@ -208,8 +188,6 @@ class DecentralizedPlayer(PlayerInterf):
 
             player_state = self.game.get_player_state(self.player_id)
             self.current_shard.server.join_shard(self.player_id, shard_id, player_state)
-
-            time.sleep(1)
 
 
 def start_agent(player, player_type, render):

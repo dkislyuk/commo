@@ -25,6 +25,7 @@ from schemas.commo.ttypes import GameStatus
 from schemas.commo.ttypes import JoinShardResponse
 from schemas.commo.ttypes import LeaveShardResponse
 from schemas.commo.ttypes import Location
+from schemas.commo.ttypes import PlayerState
 from schemas.commo.ttypes import StatusCode
 
 logging.basicConfig()
@@ -55,11 +56,16 @@ class ShardSyncWatcher(SyncObj):
 
 class ShardServerHandler:
 
-    def __init__(self):
-        self.sharded_game = Game(num_shards=1)
+    def __init__(self, replicated_storage, synced_obj):
+        self.sharded_game = Game()
+        # self.sharded_game.game_state = \
+        #     GameState(player_states=replicated_storage)
+
+        self.synced_obj = synced_obj
+        self.replicated_storage = replicated_storage
 
     def ping(self):
-        logger.info("Sanity check of shard server")
+        logger.info("Sanity check of shard server by a client")
 
     # Only valid action
     def take_action(self, player_id, action):
@@ -80,6 +86,24 @@ class ShardServerHandler:
     def join_shard(self, player_id, shard_id, player_state):
         response = JoinShardResponse()
         self.sharded_game.add_player(player_id, player_state)
+
+        # logger.info("Setting synced state....")
+        # self.replicated_storage.set(-1, player_state, sync=True)
+
+        # while True:
+        #     synced = (player_id in self.sharded_game.state.player_states.keys())
+        #     if synced:
+        #         break
+        #     logger.info("Player %s not in game state yet, blocking... (available players %s)" %
+        #                 (player_id, self.sharded_game.state.player_states.keys()))
+        #     logger.info(self.replicated_storage)
+        #     logger.info(self.replicated_storage.get(-1))
+        #     logger.info(self.replicated_storage.keys())
+        #     logger.info(self.synced_obj.isReady())
+        #     logger.info(self.synced_obj._isLeader())
+
+        #     time.sleep(1)
+
         return response
 
     def leave_shard(self, player_id, shard_id):
@@ -124,7 +148,8 @@ class ShardServer:
         host = self.my_serverport.server
         port = self.my_serverport.port
 
-        handler = ShardServerHandler()
+        handler = ShardServerHandler(replicated_storage=self.watcher.replicated_game_state,
+                                     synced_obj=self.watcher)
         processor = CommoServer.Processor(handler)
         transport = TSocket.TServerSocket(host=host, port=port + 1000)
         tfactory = TTransport.TBufferedTransportFactory()
@@ -134,7 +159,26 @@ class ShardServer:
         self.server.setNumThreads(SERVER_THREADS)
 
         # Make the game state synchronized within the RAFT server
-        shared_game_state = GameState(player_states=self.watcher.replicated_game_state)
+
+        #shared_game_state = GameState(player_states=self.watcher.replicated_game_state)
+
+        # logger.info(self.watcher.replicated_game_state)
+
+        # self.watcher.replicated_game_state[-1] = PlayerState(location=Location(x=20, y=20), health=100)
+
+        # while True:
+        #     state = self.watcher.replicated_game_state.get(-1)
+        #     logger.info(state)
+
+        #     if state:
+        #         break
+
+        #     time.sleep(1)
+
+        # logger.info("REPLICATED STATE ****************")
+        # logger.info(shared_game_state.player_states[-1])
+        # logger.info("REPLICATED STATE ****************")
+
         #handler.sharded_game.state = shared_game_state
 
     def start_shard_server(self):
