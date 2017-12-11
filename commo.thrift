@@ -5,8 +5,10 @@ struct Location {
 
 enum GameStatus {
     WAITING_FOR_PLAYERS = 1
-    STARTED = 2
-    ENDED = 3
+    SHARD_LEADERS_ASSIGNED = 2
+
+    STARTED = 3
+    ENDED = 4
 }
 
 struct PlayerState {
@@ -19,10 +21,6 @@ struct GameState {
     2: map<i32, i32> clusters
 }
 
-struct StartGameResponse {
-    1: GameStatus status,
-    2: GameState updated_game_state
-}
 
 enum StatusCode {
     SUCCESS = 1
@@ -36,12 +34,23 @@ enum ActionType {
     HEAL = 3
 }
 
-
 struct Action {
     1: ActionType type,
     2: Location move_target,
     3: i32 attack_target,
     4: i32 heal_target
+}
+
+struct ServerPort {
+    1: string server,
+    2: i16 port,
+    3: i32 player_id
+}
+
+struct StartGameResponse {
+    1: GameStatus status,
+    2: GameState updated_game_state
+    3: map<i32, list<ServerPort>> shard_mapping
 }
 
 struct ActionResponse {
@@ -54,12 +63,35 @@ struct ClockSyncResponse {
     2: i64 timestamp
 }
 
+struct ShardLeaderAssignmentResponse {
+    1: GameStatus status,
+    2: map<i32, list<ServerPort>> shard_mapping
+}
+
+struct LeaveShardResponse {
+    1: StatusCode status
+}
+
+struct JoinShardResponse {
+    1: StatusCode status
+}
+
 service CommoServer {
    void ping(),
    i32 join_game(),
+
+   ShardLeaderAssignmentResponse get_shard_assignments(),
+   void confirm_shard_leader(1: i32 player_id, 2: i32 shard_id),
+
    StartGameResponse start_game(),
    ActionResponse take_action(1: i32 player_id, 2: Action action),
 
-   ClockSyncResponse clockSync(1: i32 clientId, 2: i64 timestamp),
+   LeaveShardResponse leave_shard(1: i32 player_id, 2: i32 shard_id),
+   JoinShardResponse join_shard(1: i32 player_id,
+                                2: i32 shard_id,
+                                3: PlayerState player_state),
+
+   # Decentralized COMMO
+   ClockSyncResponse clock_sync(1: i32 client_id, 2: i64 timestamp),
 }
 

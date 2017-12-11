@@ -13,12 +13,30 @@ logger.setLevel('INFO')
 
 
 class Game(object):
-    def __init__(self, width=GAME_WIDTH, height=GAME_HEIGHT):
+    def __init__(self, width=GAME_WIDTH, height=GAME_HEIGHT, num_shards=4):
         self.width = width
         self.height = height
+        self.num_shards = num_shards
 
         self.game_state = GameState(player_states={})
         self.game_status = GameStatus.WAITING_FOR_PLAYERS
+
+    def location_to_shard_id(self, location):
+        #return 0
+
+        # For now test with only 4 shards
+        assert self.num_shards == 4
+
+        if location.x < (self.width / 2) and location.y < (self.width / 2):
+            return 0
+        elif location.x >= (self.width / 2) and location.y < (self.width / 2):
+            return 1
+        elif location.x < (self.width / 2) and location.y >= (self.width / 2):
+            return 2
+        elif location.x >= (self.width / 2) and location.y >= (self.width / 2):
+            return 3
+        else:
+            raise Exception("Unknown location %s" % location)
 
     @property
     def status(self):
@@ -43,13 +61,15 @@ class Game(object):
         """
         self.game_state = state
 
+    def num_players(self):
+        return len(self.game_state.player_states)
+
     def _initialize_player(self, player_id):
         player_state = PlayerState(location=self.random_location(),
                                    health=INITIAL_HEALTH)
         self.game_state.player_states[player_id] = player_state
 
-
-    def add_player(self):
+    def create_player(self):
         """
         Returns: Assigned player id
         """
@@ -61,12 +81,26 @@ class Game(object):
         self._initialize_player(player_id)
         return player_id
 
+    def add_player(self, player_id, player_state):
+        """
+        Game shards can add players directly to their local state
+        """
+        assert player_id not in self.game_state.player_states
+        self.game_state.player_states[player_id] = player_state
+
+    def remove_player(self, player_id):
+        del self.game_state.player_states[player_id]
+
+    def get_player_state(self, player_id):
+        return self.game_state.player_states[player_id]
+
     def start_game(self):
         """
         Returns: GameStatus
 
         """
-        if len(self.game_state.player_states) >= NUM_PLAYERS_TO_START:
+        if self.game_status != GameStatus.STARTED and \
+                len(self.game_state.player_states) >= NUM_PLAYERS_TO_START:
             logger.info('#################')
             logger.info('# Starting Game #')
             logger.info('#################')

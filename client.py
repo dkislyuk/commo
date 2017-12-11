@@ -3,7 +3,7 @@ import logging
 import time
 
 
-from pysyncobj import SyncObj, SyncObjConf
+from pysyncobj import SyncObj, SyncObjConf, replicated
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
@@ -21,7 +21,7 @@ from schemas.commo.ttypes import StatusCode
 logging.basicConfig()
 
 
-def connect_to_server():
+def connect_to_master_server():
     # Make socket
     socket = TSocket.TSocket(SERVER_HOST, SERVER_PORT)
     transport = TTransport.TBufferedTransport(socket)
@@ -33,22 +33,6 @@ def connect_to_server():
     server.ping()
 
     return transport, server
-
-
-def generate_cluster_serverport(client_id):
-    return 'localhost:%s' % (9000 + client_id)
-
-
-class SyncedGameStateWatcher(SyncObj):
-    def __init__(self, client_id):
-        conf = SyncObjConf(dynamicMembershipChange=True)
-        serverport = generate_cluster_serverport(client_id)
-        super(SyncedGameStateWatcher, self).__init__(serverport, [], conf=conf)
-        self.__counter = 0
-
-
-# def create_synced_obj(client_id):
-#port = SERVER_PORT + client_id
 
 
 # Base Class that defines player interface. UI will work as long as interface is defined.
@@ -104,16 +88,14 @@ class CentralizedPlayer(PlayerInterf):
     def __init__(self):
         self.game = Game()
 
-        self.transport, self.server = connect_to_server()
+        self.transport, self.server = connect_to_master_server()
         self.player_id = self.server.join_game()
 
-        # Set up the decentralized watcher
-        self.cluster = SyncedGameStateWatcher(self.player_id)
+        global logger
 
         logger = logging.getLogger("commo-client-%s" % self.player_id)
         logger.setLevel('DEBUG')
         logger.info('Joined game with player id: %s' % self.player_id)
-        global logger
 
         # Wait until game begins
         while True:
@@ -217,18 +199,6 @@ def random_move_agent(player):
         if response_status == StatusCode.SUCCESS:
             current_location = player.world.state.player_states[player.id].location
             logger.info("Moved to %s" % current_location)
-
-            for pid, player_state in player.world.state.player_states.iteritems():
-                if pid != player.id:
-                    if player.world.within_proximity(current_location,
-                                                     player_state.location):
-                        logger.info("PROXIMITY WARNING with player %s" %
-                                    pid)
-
-                        proximity_serverport = generate_cluster_serverport(pid)
-                        player.cluster.addNodeToCluster(proximity_serverport)
-                        import ipdb; ipdb.set_trace()
-
 
 if __name__ == '__main__':
     player = CentralizedPlayer()
